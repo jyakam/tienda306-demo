@@ -18,7 +18,6 @@ import { filtrarPorTextoLibre } from '../../funciones/helpers/filtrarPorTextoLib
 import { generarContextoProductosIA } from '../../funciones/helpers/generarContextoProductosIA.mjs'
 import { flowProductos } from '../flowProductos.mjs'
 import { flowDetallesProducto } from '../flowDetallesProducto.mjs'
-
 import { ActualizarFechasContacto, ActualizarResumenUltimaConversacion } from '../../funciones/helpers/contactosSheetHelper.mjs'
 import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
 import { generarResumenConversacionIA } from '../../funciones/helpers/generarResumenConversacion.mjs'
@@ -56,7 +55,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('🧾 [IAINFO] Texto agrupado final del usuario:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' }) // limpieza
+      await state.update({ productoReconocidoPorIA: '' }) // Limpieza aplicada ✅
 
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
@@ -125,7 +124,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' }) // limpieza
+      await state.update({ productoReconocidoPorIA: '' }) // Limpieza aplicada ✅
 
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
@@ -159,4 +158,76 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     return tools.fallBack()
   })
 
-// (las funciones manejarRespuestaIA, Responder, obtenerProductosCorrectos y esAclaracionSobreUltimaSugerencia se mantienen idénticas, sin cambios)
+async function manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt) {
+  const respuestaIA = res.respuesta?.toLowerCase?.() || ''
+  console.log('🧠 Token recibido de IA:', respuestaIA)
+
+  if (respuestaIA.includes('🧩 mostrarproductos')) {
+    await state.update({ ultimaConsulta: txt })
+    return gotoFlow(flowProductos)
+  }
+
+  if (respuestaIA.includes('🧩 mostrardetalles')) {
+    return gotoFlow(flowDetallesProducto)
+  }
+
+  if (respuestaIA.includes('🧩 solicitarayuda')) {
+    return gotoFlow(flowProductos)
+  }
+
+  await Responder(res, ctx, flowDynamic, state)
+}
+
+async function Responder(res, ctx, flowDynamic, state) {
+  if (res.tipo === ENUM_IA_RESPUESTAS.TEXTO && res.respuesta) {
+    await Esperar(BOT.DELAY)
+
+    const yaRespondido = state.get('ultimaRespuestaSimple') || ''
+    const nuevaRespuesta = res.respuesta.toLowerCase().trim()
+
+    if (nuevaRespuesta && nuevaRespuesta === yaRespondido) {
+      console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.')
+      return
+    }
+
+    await state.update({ ultimaRespuestaSimple: nuevaRespuesta })
+
+    const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx)
+    return await flowDynamic(msj)
+  }
+}
+
+async function obtenerProductosCorrectos(texto, state) {
+  const sugeridos = state.get('productosUltimaSugerencia') || []
+  console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
+
+  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
+    console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
+    return filtrarPorTextoLibre(sugeridos, texto)
+  }
+
+  if (await esMensajeRelacionadoAProducto(texto, state)) {
+    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
+    const productosFull = state.get('_productosFull') || []
+    return filtrarPorTextoLibre(productosFull, texto)
+  }
+
+  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
+  if (esConsultaProductos) {
+    console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
+    const productosFull = state.get('_productosFull') || []
+    return filtrarPorTextoLibre(productosFull, texto)
+  }
+
+  console.log('🚫 [IAINFO] No se detectó relación con productos.')
+  return []
+}
+
+async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
+  const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
+  if (patronesFijos.test(texto)) return true
+
+  const ultimaConsulta = (state.get('ultimaConsulta') || '').toLowerCase()
+  const textoLower = texto.toLowerCase()
+  return ultimaConsulta && textoLower.length <= 12 && !textoLower.includes('hola') && textoLower.length >= 3
+}
