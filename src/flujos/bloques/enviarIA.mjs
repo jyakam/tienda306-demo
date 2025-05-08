@@ -40,6 +40,12 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     funciones.state.clear()
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
     console.log('📥 RESPUESTA IA IMAGEN:', res)
+
+    if (res?.respuesta) {
+      await funciones.state.update({ productoReconocidoPorIA: res.respuesta })
+      console.log('🧠 [IA] Producto reconocido en imagen guardado en state:', res.respuesta)
+    }
+
     return res
   }
 
@@ -63,6 +69,12 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     console.log('🧠 MENSAJE FINAL COMPLETO A LA IA (AUDIO):\n', final)
     const res = await EnviarTextoOpenAI(final, funciones.ctx.from, guion, estado)
     console.log('📥 RESPUESTA IA AUDIO:', res)
+
+    if (res?.respuesta) {
+      await funciones.state.update({ productoReconocidoPorIA: res.respuesta })
+      console.log('🧠 [IA] Producto reconocido en audio guardado en state:', res.respuesta)
+    }
+
     return res
   }
 
