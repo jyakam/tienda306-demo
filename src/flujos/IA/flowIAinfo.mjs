@@ -50,9 +50,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
 
-      console.log('🧾 [IAINFO] Texto agrupado final del usuario:', txt)
+      const productoReconocido = state.get('productoReconocidoPorIA') || ''
+      const textoFinal = productoReconocido ? `${txt} ${productoReconocido}` : txt
 
-      const productos = await obtenerProductosCorrectos(txt, state)
+      console.log('🧾 [IAINFO] Texto agrupado final del usuario:', textoFinal)
+
+      const productos = await obtenerProductosCorrectos(textoFinal, state)
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
       if (productos.length) {
@@ -114,9 +117,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
       Escribiendo(ctx)
 
-      console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', txt)
+      const productoReconocido = state.get('productoReconocidoPorIA') || ''
+      const textoFinal = productoReconocido ? `${txt} ${productoReconocido}` : txt
 
-      const productos = await obtenerProductosCorrectos(txt, state)
+      console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', textoFinal)
+
+      const productos = await obtenerProductosCorrectos(textoFinal, state)
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
       if (productos.length) {
