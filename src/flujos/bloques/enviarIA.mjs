@@ -42,8 +42,9 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     console.log('📥 RESPUESTA IA IMAGEN:', res)
 
     if (res?.respuesta) {
-      await funciones.state.update({ productoReconocidoPorIA: res.respuesta })
-      console.log('🧠 [IA] Producto reconocido en imagen guardado en state:', res.respuesta)
+      const posibleProducto = extraerNombreProducto(res.respuesta)
+      await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
+      console.log('🧠 [IA] Producto reconocido en imagen guardado en state:', posibleProducto)
     }
 
     return res
@@ -71,8 +72,9 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     console.log('📥 RESPUESTA IA AUDIO:', res)
 
     if (res?.respuesta) {
-      await funciones.state.update({ productoReconocidoPorIA: res.respuesta })
-      console.log('🧠 [IA] Producto reconocido en audio guardado en state:', res.respuesta)
+      const posibleProducto = extraerNombreProducto(res.respuesta)
+      await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
+      console.log('🧠 [IA] Producto reconocido en audio guardado en state:', posibleProducto)
     }
 
     return res
@@ -101,4 +103,23 @@ function generateUniqueFileName(extension) {
   const timestamp = Date.now()
   const randomNumber = Math.floor(Math.random() * 1000)
   return `file_${timestamp}_${randomNumber}.${extension}`
+}
+
+// 🧠 EXTRAER POSIBLE NOMBRE DE PRODUCTO DE LA RESPUESTA IA
+function extraerNombreProducto(respuesta = '') {
+  try {
+    // Busca nombres entre comillas o asteriscos o patrones comunes
+    const entreComillas = respuesta.match(/"(.*?)"/)
+    if (entreComillas) return entreComillas[1].trim()
+
+    const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
+    if (entreAsteriscos) return entreAsteriscos[1].trim()
+
+    const linea = respuesta.split('\n')[0]
+    if (linea.length <= 60) return linea.trim()
+
+    return respuesta.slice(0, 40).trim()
+  } catch {
+    return respuesta.trim().slice(0, 40)
+  }
 }
