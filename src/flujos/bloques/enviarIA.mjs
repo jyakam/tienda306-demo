@@ -108,7 +108,23 @@ function generateUniqueFileName(extension) {
 // 🧠 EXTRAER POSIBLE NOMBRE DE PRODUCTO DE LA RESPUESTA IA
 function extraerNombreProducto(respuesta = '') {
   try {
-    // Busca nombres entre comillas o asteriscos o patrones comunes
+    // Patrones comunes de productos
+    const patrones = [
+      /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
+      /el\s+té\s+de\s+([a-záéíóúñ\s]+)/i,
+      /el\s+([a-záéíóúñ\s]+?)\s+(?:no|sí)/i,
+      /(?:tienes|manejan|tienen)\s+(el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
+      /(?:no\s+tengo|no\s+disponible)\s+(.*?)\s+(?:pero|si)/i
+    ]
+
+    for (const patron of patrones) {
+      const match = respuesta.match(patron)
+      if (match) {
+        const resultado = match[1] || match[2]
+        if (resultado && resultado.trim().length >= 3) return resultado.trim()
+      }
+    }
+
     const entreComillas = respuesta.match(/"(.*?)"/)
     if (entreComillas) return entreComillas[1].trim()
 
