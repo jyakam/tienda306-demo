@@ -82,8 +82,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
         console.log('📡 [IAINFO] Resultado de obtenerIntencionConsulta:', { esConsultaProductos })
 
-        if (esConsultaProductos) {
-          console.log('🔍 [IAINFO] Intención de producto detectada para imagen.')
+        if (esConsultaProductos || productoReconocido) {
+          console.log('🔍 [IAINFO] Intención de producto detectada para imagen o producto reconocido.')
           console.log('🔍 [DEBUG] textoFinal antes de obtenerProductosCorrectos:', textoFinal)
           console.log('🔍 [DEBUG] productoReconocidoPorIA antes de obtenerProductosCorrectos:', productoReconocido)
           productos = await obtenerProductosCorrectos(textoFinal, state)
@@ -282,7 +282,7 @@ async function obtenerProductosCorrectos(texto, state) {
   }
 
   if (await esMensajeRelacionadoAProducto(texto, state) || productoReconocido) {
-    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
+    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico o producto reconocido.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', texto)
     return filtrarPorTextoLibre(productosFull, texto)
