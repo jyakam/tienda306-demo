@@ -72,12 +72,22 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         if (productoReconocido) {
           textoFinal = `${txt} ${productoReconocido}` // Combinar caption con producto reconocido
         }
+        console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
-        productos = await obtenerProductosCorrectos(textoFinal, state)
-        if (productos.length) {
-          await state.update({ productosUltimaSugerencia: productos })
-          promptExtra = generarContextoProductosIA(productos, state)
-          console.log(`📦 [IAINFO] ${productos.length} productos encontrados para textoFinal:`, textoFinal)
+        // Verificar intención de consulta con el contexto combinado
+        const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
+        console.log('📡 [IAINFO] Resultado de obtenerIntencionConsulta:', { esConsultaProductos })
+
+        if (esConsultaProductos) {
+          console.log('🔍 [IAINFO] Intención de producto detectada para imagen.')
+          productos = await obtenerProductosCorrectos(textoFinal, state)
+          if (productos.length) {
+            await state.update({ productosUltimaSugerencia: productos })
+            promptExtra = generarContextoProductosIA(productos, state)
+            console.log(`📦 [IAINFO] ${productos.length} productos encontrados para textoFinal:`, textoFinal)
+          }
+        } else {
+          console.log('🚫 [IAINFO] No se detectó intención de producto para imagen.')
         }
 
         // Reutilizar la respuesta de la IA procesada
