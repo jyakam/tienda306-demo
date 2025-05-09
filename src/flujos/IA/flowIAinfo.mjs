@@ -43,7 +43,7 @@ async function limpiarProductoReconocido(state) {
   console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado.')
 }
 
-// Función para extraer nombre de producto (reutilizada de enviarIA.mjs)
+// Función para extraer nombre de producto
 function extraerNombreProducto(respuesta = '') {
   try {
     const patrones = [
@@ -101,9 +101,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('📦 [IAINFO] Productos cargados en cache para:', phone)
     }
 
+    // Detectar archivos y esperar a que tipoMensaje esté listo
     const detectar = await DetectarArchivos(ctx, state)
+    await Esperar(100) // Aumentar espera para asegurar que state se actualice
     const tipoMensaje = state.get('tipoMensaje')
-    console.log('🔍 [IAINFO] Antes de evaluar tipoMensaje:', tipoMensaje, 'productoReconocidoPorIA:', state.get('productoReconocidoPorIA'))
+    console.log('🔍 [IAINFO] Valor de tipoMensaje obtenido:', tipoMensaje)
+    console.log('🔍 [IAINFO] Después de DetectarArchivos:', { tipoMensaje, productoReconocidoPorIA: state.get('productoReconocidoPorIA') })
 
     // Procesar imagen primero si es un mensaje de imagen
     if (tipoMensaje === 1) {
@@ -190,6 +193,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     }
 
     // Flujo para mensajes de texto
+    console.log('📝 [IAINFO] Procesando mensaje de texto...')
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
 
@@ -256,6 +260,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     }
 
     const detectar = await DetectarArchivos(ctx, state)
+    console.log('🔍 [IAINFO] Después de DetectarArchivos (segundo addAction):', { tipoMensaje: state.get('tipoMensaje'), productoReconocidoPorIA: state.get('productoReconocidoPorIA') })
+
     AgruparMensaje(detectar, async (txt) => {
       if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
       reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
@@ -382,7 +388,7 @@ async function obtenerProductosCorrectos(texto, state) {
 
 async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
   const productoReconocido = state.get('productoReconocidoPorIA') || ''
-  if (productoReconocido) return false // Evitar aclaración para imágenes con producto reconocido
+  if (productoReconocido) return false
 
   const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
   if (patronesFijos.test(texto)) return true
