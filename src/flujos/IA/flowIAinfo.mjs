@@ -281,7 +281,7 @@ async function obtenerProductosCorrectos(texto, state) {
     return filtrarPorTextoLibre(sugeridos, texto)
   }
 
-  if (await esMensajeRelacionadoAProducto(texto, state)) {
+  if (await esMensajeRelacionadoAProducto(texto, state) || productoReconocido) {
     console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', texto)
