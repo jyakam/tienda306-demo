@@ -51,12 +51,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
       const productoReconocido = state.get('productoReconocidoPorIA') || ''
       const textoFinal = productoReconocido ? `${txt} ${productoReconocido}` : txt
+      console.log('🔍 [DEBUG] productoReconocidoPorIA usado en búsqueda:', productoReconocido)
 
       console.log('🧾 [IAINFO] Texto agrupado final del usuario:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' })
-
+      
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
       if (productos.length) {
@@ -87,6 +87,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
+      await state.update({ productoReconocidoPorIA: '' })
+      console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
     })
   })
 
@@ -120,6 +122,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
       const productoReconocido = state.get('productoReconocidoPorIA') || ''
       const textoFinal = productoReconocido ? `${txt} ${productoReconocido}` : txt
+      console.log('🔍 [DEBUG] productoReconocidoPorIA usado en búsqueda:', productoReconocido)
 
       console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', textoFinal)
 
@@ -153,6 +156,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
+      await state.update({ productoReconocidoPorIA: '' })
+      console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
     })
 
     return tools.fallBack()
