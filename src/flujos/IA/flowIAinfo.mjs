@@ -199,24 +199,28 @@ async function Responder(res, ctx, flowDynamic, state) {
 
 async function obtenerProductosCorrectos(texto, state) {
   const sugeridos = state.get('productosUltimaSugerencia') || []
-  console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
+  const productoReconocido = state.get('productoReconocidoPorIA') || ''
+  const textoFinal = productoReconocido ? `${texto} ${productoReconocido}` : texto
 
-  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
+  console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
+  console.log('🧪 [flowIAinfo] Texto final utilizado en búsqueda:', textoFinal)
+
+  if (await esAclaracionSobreUltimaSugerencia(textoFinal, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
-    return filtrarPorTextoLibre(sugeridos, texto)
+    return filtrarPorTextoLibre(sugeridos, textoFinal)
   }
 
-  if (await esMensajeRelacionadoAProducto(texto, state)) {
+  if (await esMensajeRelacionadoAProducto(textoFinal, state)) {
     console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
     const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, texto)
+    return filtrarPorTextoLibre(productosFull, textoFinal)
   }
 
-  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
+  const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
   if (esConsultaProductos) {
     console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
     const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, texto)
+    return filtrarPorTextoLibre(productosFull, textoFinal)
   }
 
   console.log('🚫 [IAINFO] No se detectó relación con productos.')
