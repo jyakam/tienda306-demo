@@ -25,6 +25,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
 
     const datos = funciones.state.get('archivos') || []
     const imagenes = datos.filter(item => item.tipo === ENUM_TIPO_ARCHIVO.IMAGEN)
+    console.log('DEBUG: Imágenes encontradas en state:', imagenes)
 
     for (const img of imagenes) {
       const imagenBase64 = fs.readFileSync(img.ruta, { encoding: 'base64' })
@@ -37,6 +38,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       })
     }
 
+    console.log('DEBUG: Objeto enviado a OpenAI:', objeto)
     funciones.state.clear()
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
     console.log('📥 RESPUESTA IA IMAGEN:', res)
@@ -45,6 +47,8 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
       await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
       console.log('🧠 [IA] Producto reconocido en imagen guardado en state:', posibleProducto)
+    } else {
+      console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
 
     return res
