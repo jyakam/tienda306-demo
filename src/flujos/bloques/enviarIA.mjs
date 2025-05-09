@@ -1,4 +1,3 @@
-// src/flujos/bloques/EnviarIA.mjs
 import fs from 'fs'
 import { BOT } from '../../config/bot.mjs'
 import { ENUM_TIPO_ARCHIVO } from './detectarArchivos.mjs'
@@ -8,7 +7,7 @@ import { convertOggToMp3 } from '../../funciones/convertirMp3.mjs'
 import { EnviarAudioOpenAI } from '../../APIs/OpenAi/enviarAudioOpenAI.mjs'
 
 export async function EnviarIA(msj, guion, funciones, estado = {}) {
-  const tipoMensaje = funciones.state.get('tipoMensaje')
+  const tipoMensaje = funciones.state ? funciones.state.get('tipoMensaje') : null
   const promptExtra = funciones.promptExtra || ''
 
   const mensajeFinal = promptExtra ? `${promptExtra}\n\n${msj}` : msj
@@ -17,13 +16,14 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
   console.log('📊 [AUDITORIA] Tipo de mensaje:', tipoMensaje)
   console.log('📊 [AUDITORIA] Prompt extra incluido:', !!promptExtra)
   console.log('📊 [AUDITORIA] Estado cliente:', estado)
+  console.log('🔍 [EnviarIA] Contenido de funciones:', funciones)
 
   // --- 📸 IMAGEN ---
   if (tipoMensaje === ENUM_TIPO_ARCHIVO.IMAGEN) {
     console.log('📤 🌄 Enviando imagen a OpenAI...')
     const objeto = { role: 'user', content: [{ type: 'text', text: msj }] }
 
-    const datos = funciones.state.get('archivos') || []
+    const datos = funciones.state ? funciones.state.get('archivos') || [] : []
     const imagenes = datos.filter(item => item.tipo === ENUM_TIPO_ARCHIVO.IMAGEN)
     console.log('DEBUG: Imágenes encontradas en state:', imagenes)
 
@@ -38,7 +38,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       })
     }
 
-    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', funciones.state.get())
+    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', funciones.state ? funciones.state.get() : 'state no definido')
     console.log('📤 [EnviarIA] Input para EnviarImagenOpenAI:', { prompt: msj, archivos: imagenes })
 
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
@@ -47,14 +47,20 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
       console.log('⚠️ [DEBUG] Valor de posibleProducto antes de guardar en state:', posibleProducto)
-      await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
-      console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
+      if (funciones.state) {
+        await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
+        console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
+      } else {
+        console.error('❌ [EnviarIA] No se pudo actualizar estado: state no definido')
+      }
     } else {
       console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
 
-    funciones.state.clear()
-    console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state.get())
+    if (funciones.state) {
+      funciones.state.clear()
+      console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state.get())
+    }
 
     return res
   }
@@ -63,7 +69,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
   if (tipoMensaje === ENUM_TIPO_ARCHIVO.NOTA_VOZ) {
     console.log('📤 🎵 Enviando nota de voz a OpenAI...')
     const mensaje = []
-    const datos = funciones.state.get('archivos') || []
+    const datos = funciones.state ? funciones.state.get('archivos') || [] : []
     const audios = datos.filter(item => item.tipo === ENUM_TIPO_ARCHIVO.NOTA_VOZ)
 
     for (const aud of audios) {
