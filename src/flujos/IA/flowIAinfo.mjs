@@ -69,12 +69,21 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         }, estado)
         console.log('🔍 [DEBUG] EnviarIA completado, respuesta:', resIA?.respuesta)
 
+        // Esperar un breve momento para asegurar que el estado se actualice
+        await Esperar(100)
+
         const productoReconocido = state.get('productoReconocidoPorIA') || ''
         console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de EnviarIA:', productoReconocido)
 
         // Usar solo productoReconocidoPorIA como textoFinal
-        textoFinal = productoReconocido || txt // Fallback al caption si no hay producto reconocido
+        textoFinal = productoReconocido || '' // Ignorar caption
         console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
+
+        if (!textoFinal) {
+          console.log('🚫 [IAINFO] No se reconoció producto en la imagen, procesando respuesta normal.')
+          await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, txt)
+          return
+        }
 
         // Verificar intención de consulta con textoFinal
         console.log('🔍 [DEBUG] Texto enviado a obtenerIntencionConsulta:', textoFinal)
@@ -98,7 +107,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           await manejarRespuestaIA(resIAConProductos, ctx, flowDynamic, gotoFlow, state, textoFinal)
         } else {
           console.log('🚫 [IAINFO] Imagen no relacionada con productos, procesando respuesta normal.')
-          await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
+          await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, txt)
         }
 
         // Actualizar datos de contacto y resumen
@@ -278,12 +287,12 @@ async function obtenerProductosCorrectos(texto, state) {
   console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
   console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
 
-  // Usar texto directamente, ya incluye productoReconocidoPorIA para imágenes
+  // Usar texto directamente, ya es productoReconocidoPorIA para imágenes
   const textoBusqueda = texto
   console.log('🔍 [DEBUG] textoBusqueda para filtrarPorTextoLibre:', textoBusqueda)
 
-  // Evitar aclaración si productoReconocidoPorIA está presente
-  if (productoReconocido && sugeridos.length) {
+  // Forzar nueva búsqueda si hay productoReconocidoPorIA
+  if (productoReconocido) {
     console.log('🔍 [IAINFO] Nueva búsqueda con productoReconocidoPorIA, ignorando aclaración.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (nueva búsqueda):', textoBusqueda)
@@ -296,8 +305,8 @@ async function obtenerProductosCorrectos(texto, state) {
     return filtrarPorTextoLibre(sugeridos, textoBusqueda, state)
   }
 
-  if (await esMensajeRelacionadoAProducto(texto, state) || productoReconocido) {
-    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico o producto reconocido.')
+  if (await esMensajeRelacionadoAProducto(texto, state)) {
+    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', textoBusqueda)
     return filtrarPorTextoLibre(productosFull, textoBusqueda, state)
