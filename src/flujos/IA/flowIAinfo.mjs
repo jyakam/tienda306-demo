@@ -55,14 +55,14 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       let promptExtra = ''
 
       // Procesar imagen primero si es un mensaje de imagen
-      if (tipoMensaje === 1) { // Usar valor literal 1 para imágenes, según logs
+      if (tipoMensaje === 1) {
         console.log('📸 [IAINFO] Procesando imagen antes de la búsqueda...')
         const estado = {
           esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
           contacto: contacto || {}
         }
 
-        // Llamar a EnviarIA y esperar a que complete
+        // Procesar imagen con IA para extraer producto
         console.log('🔍 [DEBUG] Llamando a EnviarIA para procesar imagen...')
         const resIA = await EnviarIA(txt, ENUNGUIONES.INFO, {
           ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
@@ -72,28 +72,35 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         const productoReconocido = state.get('productoReconocidoPorIA') || ''
         console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de EnviarIA:', productoReconocido)
 
+        // Combinar caption con producto reconocido
         if (productoReconocido) {
-          textoFinal = `${txt} ${productoReconocido}` // Combinar caption con producto reconocido
+          textoFinal = `${txt} ${productoReconocido}`
         }
         console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
-        // Verificar intención de consulta con el contexto combinado
+        // Verificar intención de consulta con el texto combinado
         console.log('🔍 [DEBUG] Texto enviado a obtenerIntencionConsulta:', textoFinal)
         const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
         console.log('📡 [IAINFO] Resultado de obtenerIntencionConsulta:', { esConsultaProductos })
 
+        // Procesar según intención
         if (esConsultaProductos || productoReconocido) {
-          console.log('🔍 [IAINFO] Intención de producto detectada para imagen o producto reconocido.')
+          console.log('🔍 [IAINFO] Intención de producto detectada para imagen.')
           console.log('🔍 [DEBUG] textoFinal antes de obtenerProductosCorrectos:', textoFinal)
-          console.log('🔍 [DEBUG] productoReconocidoPorIA antes de obtenerProductosCorrectos:', productoReconocido)
           productos = await obtenerProductosCorrectos(textoFinal, state)
           if (productos.length) {
             await state.update({ productosUltimaSugerencia: productos })
             promptExtra = generarContextoProductosIA(productos, state)
             console.log(`📦 [IAINFO] ${productos.length} productos encontrados para textoFinal:`, textoFinal)
           }
+          // Reprocesar respuesta de IA con contexto de productos
+          const resIAConProductos = await EnviarIA(textoFinal, ENUNGUIONES.INFO, {
+            ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
+          }, estado)
+          await manejarRespuestaIA(resIAConProductos, ctx, flowDynamic, gotoFlow, state, textoFinal)
         } else {
-          console.log('🚫 [IAINFO] No se detectó intención de producto para imagen.')
+          console.log('🚫 [IAINFO] Imagen no relacionada con productos, procesando respuesta normal.')
+          await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
         }
 
         // Actualizar datos de contacto y resumen
@@ -108,8 +115,6 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           console.log('📝 [IAINFO] Resumen de conversación guardado.')
         }
 
-        // Enviar la respuesta de la IA
-        await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
         await state.update({ productoReconocidoPorIA: '' })
         console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
         return
@@ -275,24 +280,21 @@ async function obtenerProductosCorrectos(texto, state) {
   console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
   console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
 
-  // Forzar uso de productoReconocidoPorIA si existe
-  let textoBusqueda = texto
-  if (productoReconocido) {
-    textoBusqueda = `${texto} ${productoReconocido}`
-    console.log('🔍 [DEBUG] textoBusqueda ajustado con productoReconocidoPorIA:', textoBusqueda)
-  }
+  // Usar texto directamente, ya incluye productoReconocidoPorIA
+  const textoBusqueda = texto
+  console.log('🔍 [DEBUG] textoBusqueda para filtrarPorTextoLibre:', textoBusqueda)
 
   if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (aclaración):', textoBusqueda)
-    return filtrarPorTextoLibre(sugeridos, textoBusqueda)
+    return filtrarPorTextoLibre(sugeridos, textoBusqueda, state)
   }
 
   if (await esMensajeRelacionadoAProducto(texto, state) || productoReconocido) {
     console.log('🔍 [IAINFO] Producto detectado con contexto dinámico o producto reconocido.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', textoBusqueda)
-    return filtrarPorTextoLibre(productosFull, textoBusqueda)
+    return filtrarPorTextoLibre(productosFull, textoBusqueda, state)
   }
 
   const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
@@ -300,7 +302,7 @@ async function obtenerProductosCorrectos(texto, state) {
     console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
     const productosFull = state.get('_productosFull') || []
     console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (OpenAI):', textoBusqueda)
-    return filtrarPorTextoLibre(productosFull, textoBusqueda)
+    return filtrarPorTextoLibre(productosFull, textoBusqueda, state)
   }
 
   console.log('🚫 [IAINFO] No se detectó relación con productos.')
