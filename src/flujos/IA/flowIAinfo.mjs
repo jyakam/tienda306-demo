@@ -56,7 +56,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       let promptExtra = ''
 
       // Procesar imagen primero si es un mensaje de imagen
-      if (tipoMensaje === ENUM_TIPO_ARCHIVO.IMAGEN) {
+      if (tipoMensaje === 1) { // Usar valor literal 1 para imágenes, según logs
         console.log('📸 [IAINFO] Procesando imagen antes de la búsqueda...')
         const estado = {
           esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
