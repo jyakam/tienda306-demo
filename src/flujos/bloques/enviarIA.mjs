@@ -9,7 +9,11 @@ import { EnviarAudioOpenAI } from '../../APIs/OpenAi/enviarAudioOpenAI.mjs'
 // Función segura para acceder a state
 const safeGet = (state, key) => {
   try {
-    return state?.get?.(key) ?? null
+    if (!state || typeof state.get !== 'function') {
+      console.error(`❌ [safeGet] Estado inválido para key ${key}:`, state)
+      return null
+    }
+    return state.get(key) ?? null
   } catch (error) {
     console.error(`❌ [safeGet] Error al acceder a ${key}:`, error)
     return null
@@ -18,6 +22,7 @@ const safeGet = (state, key) => {
 
 export async function EnviarIA(msj, guion, funciones, estado = {}) {
   console.log('🔍 [EnviarIA] Funciones recibidas:', Object.keys(funciones))
+  console.log('🔍 [EnviarIA] Estado de funciones.state:', funciones.state ? 'definido' : 'no definido')
   const tipoMensaje = safeGet(funciones.state, 'tipoMensaje')
   const promptExtra = funciones.promptExtra || ''
 
@@ -48,7 +53,6 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       })
     }
 
-    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', safeGet(funciones.state, null) || 'state no definido')
     console.log('📤 [EnviarIA] Input para EnviarImagenOpenAI:', { prompt: msj, archivos: imagenes })
 
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
@@ -69,7 +73,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
 
     if (funciones.state && typeof funciones.state.clear === 'function') {
       funciones.state.clear()
-      console.log('🔍 [EnviarIA] Estado después de clear:', safeGet(funciones.state, null) || 'state no definido')
+      console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state ? 'definido' : 'no definido')
     }
 
     return res
