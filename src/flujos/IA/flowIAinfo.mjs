@@ -275,25 +275,32 @@ async function obtenerProductosCorrectos(texto, state) {
   console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
   console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
 
+  // Forzar uso de productoReconocidoPorIA si existe
+  let textoBusqueda = texto
+  if (productoReconocido) {
+    textoBusqueda = `${texto} ${productoReconocido}`
+    console.log('🔍 [DEBUG] textoBusqueda ajustado con productoReconocidoPorIA:', textoBusqueda)
+  }
+
   if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (aclaración):', texto)
-    return filtrarPorTextoLibre(sugeridos, texto)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (aclaración):', textoBusqueda)
+    return filtrarPorTextoLibre(sugeridos, textoBusqueda)
   }
 
   if (await esMensajeRelacionadoAProducto(texto, state) || productoReconocido) {
     console.log('🔍 [IAINFO] Producto detectado con contexto dinámico o producto reconocido.')
     const productosFull = state.get('_productosFull') || []
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', texto)
-    return filtrarPorTextoLibre(productosFull, texto)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', textoBusqueda)
+    return filtrarPorTextoLibre(productosFull, textoBusqueda)
   }
 
   const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
   if (esConsultaProductos) {
     console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
     const productosFull = state.get('_productosFull') || []
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (OpenAI):', texto)
-    return filtrarPorTextoLibre(productosFull, texto)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (OpenAI):', textoBusqueda)
+    return filtrarPorTextoLibre(productosFull, textoBusqueda)
   }
 
   console.log('🚫 [IAINFO] No se detectó relación con productos.')
