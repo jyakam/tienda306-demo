@@ -55,7 +55,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('🧾 [IAINFO] Texto agrupado final del usuario:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' }) // Limpieza aplicada ✅
+      await state.update({ productoReconocidoPorIA: '' })
 
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
@@ -124,7 +124,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' }) // Limpieza aplicada ✅
+      await state.update({ productoReconocidoPorIA: '' })
 
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
