@@ -61,9 +61,13 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
           contacto: contacto || {}
         }
+
+        // Llamar a EnviarIA y esperar a que complete
+        console.log('🔍 [DEBUG] Llamando a EnviarIA para procesar imagen...')
         const resIA = await EnviarIA(txt, ENUNGUIONES.INFO, {
           ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
         }, estado)
+        console.log('🔍 [DEBUG] EnviarIA completado, respuesta:', resIA?.respuesta)
 
         const productoReconocido = state.get('productoReconocidoPorIA') || ''
         console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de EnviarIA:', productoReconocido)
@@ -74,6 +78,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
         // Verificar intención de consulta con el contexto combinado
+        console.log('🔍 [DEBUG] Llamando a obtenerIntencionConsulta con textoFinal:', textoFinal)
         const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
         console.log('📡 [IAINFO] Resultado de obtenerIntencionConsulta:', { esConsultaProductos })
 
@@ -91,8 +96,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           console.log('🚫 [IAINFO] No se detectó intención de producto para imagen.')
         }
 
-        // Reutilizar la respuesta de la IA procesada
-        console.log('📥 [IAINFO] Reutilizando respuesta de IA:', resIA?.respuesta)
+        // Actualizar datos de contacto y resumen
         const datosExtraidos = await extraerDatosContactoIA(txt, phone)
         const resumen = await generarResumenConversacionIA(txt, phone)
         if (Object.keys(datosExtraidos).length > 0) {
@@ -104,6 +108,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           console.log('📝 [IAINFO] Resumen de conversación guardado.')
         }
 
+        // Enviar la respuesta de la IA
         await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
         await state.update({ productoReconocidoPorIA: '' })
         console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
