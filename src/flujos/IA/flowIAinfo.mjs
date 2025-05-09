@@ -1,4 +1,3 @@
-// src/flujos/IA/flowIAinfo.mjs
 import 'dotenv/config'
 import { addKeyword, EVENTS } from '@builderbot/bot'
 import { ActualizarContacto } from '../../config/contactos.mjs'
@@ -80,6 +79,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
         if (esConsultaProductos) {
           console.log('🔍 [IAINFO] Intención de producto detectada para imagen.')
+          console.log('🔍 [DEBUG] textoFinal antes de obtenerProductosCorrectos:', textoFinal)
+          console.log('🔍 [DEBUG] productoReconocidoPorIA antes de obtenerProductosCorrectos:', productoReconocido)
           productos = await obtenerProductosCorrectos(textoFinal, state)
           if (productos.length) {
             await state.update({ productosUltimaSugerencia: productos })
@@ -266,27 +267,28 @@ async function Responder(res, ctx, flowDynamic, state) {
 async function obtenerProductosCorrectos(texto, state) {
   const sugeridos = state.get('productosUltimaSugerencia') || []
   const productoReconocido = state.get('productoReconocidoPorIA') || ''
-  const textoFinal = productoReconocido ? `${texto} ${productoReconocido}` : texto
+  console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
+  console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
 
-  console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
-  console.log('🧪 [flowIAinfo] Texto final utilizado en búsqueda:', textoFinal)
-
-  if (await esAclaracionSobreUltimaSugerencia(textoFinal, state) && sugeridos.length) {
+  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
-    return filtrarPorTextoLibre(sugeridos, textoFinal)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (aclaración):', texto)
+    return filtrarPorTextoLibre(sugeridos, texto)
   }
 
-  if (await esMensajeRelacionadoAProducto(textoFinal, state)) {
+  if (await esMensajeRelacionadoAProducto(texto, state)) {
     console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
     const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, textoFinal)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (contexto dinámico):', texto)
+    return filtrarPorTextoLibre(productosFull, texto)
   }
 
-  const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
+  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
   if (esConsultaProductos) {
     console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
     const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, textoFinal)
+    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (OpenAI):', texto)
+    return filtrarPorTextoLibre(productosFull, texto)
   }
 
   console.log('🚫 [IAINFO] No se detectó relación con productos.')
