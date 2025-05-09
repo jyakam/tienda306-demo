@@ -1,11 +1,12 @@
-export function filtrarPorTextoLibre(productos = [], texto = '') {
+export function filtrarPorTextoLibre(productos = [], texto = '', state = null) {
   if (!productos.length || !texto.trim()) return []
 
   const normalizar = (str) =>
     str.toLowerCase()
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
-      .replace(/[^a-z0-9]/gi, ' ')
+      .replace(/[^a-z0-9&]/gi, ' ') // Preservar "&" para nombres como "Lemon & Echinacea"
+      .trim()
 
   const normalizarCategoria = (cat = '') =>
     cat.toLowerCase()
@@ -19,6 +20,11 @@ export function filtrarPorTextoLibre(productos = [], texto = '') {
   const palabras = query.split(/\s+/).filter(Boolean)
   console.log('🔍 [filtrarPorTextoLibre] Texto recibido:', texto, '→ Palabras:', palabras)
 
+  // Obtener productoReconocidoPorIA desde el estado, si está disponible
+  const productoReconocido = state?.get('productoReconocidoPorIA') || ''
+  const productoReconocidoNormalizado = productoReconocido ? normalizar(productoReconocido) : ''
+  console.log('🔍 [filtrarPorTextoLibre] productoReconocidoPorIA:', productoReconocidoNormalizado)
+
   const coincidencias = productos.map((p) => {
     let score = 0
 
@@ -26,6 +32,10 @@ export function filtrarPorTextoLibre(productos = [], texto = '') {
       const campo = normalizar(valor || '')
       for (const palabra of palabras) {
         if (campo.includes(palabra)) score += peso
+      }
+      // Peso adicional para productoReconocidoPorIA
+      if (productoReconocidoNormalizado && campo.includes(productoReconocidoNormalizado)) {
+        score += 10 // Peso alto para priorizar productoReconocidoPorIA
       }
     }
 
@@ -59,7 +69,7 @@ export function filtrarPorTextoLibre(productos = [], texto = '') {
   })
 
   const coincidenciasConScore = coincidencias
-    .filter(p => p._score >= 3) // 🎯 Solo productos con score relevante
+    .filter(p => p._score >= 5) // Aumentar umbral para reducir falsos positivos
 
   const prioridad = ['tratamiento 3 mes', 'tratamiento 2 mes', 'tratamiento 1 mes', 'kit', 'tratamiento', 'individual']
 
@@ -71,7 +81,7 @@ export function filtrarPorTextoLibre(productos = [], texto = '') {
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
   })
 
-  console.log('🎯 [filtrarPorTextoLibre] Coincidencias con score ≥ 3 y ordenadas por prioridad:', resultadoOrdenado.length)
+  console.log('🎯 [filtrarPorTextoLibre] Coincidencias con score ≥ 5 y ordenadas por prioridad:', resultadoOrdenado.length)
 
   if (!resultadoOrdenado.length) {
     console.log('⚠️ [filtrarPorTextoLibre] No hubo coincidencias relevantes, devolviendo primeros destacados...')
