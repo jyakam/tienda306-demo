@@ -69,7 +69,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         contacto: contacto || {}
       }
 
-      const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
+      const res = await EnviarIA(textoFinal, ENUNGUIONES.INFO, {
         ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
       }, estado)
 
@@ -86,7 +86,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
-      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
     })
   })
 
@@ -137,7 +137,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         contacto: { ...contacto, ...datos }
       }
 
-      const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
+      const res = await EnviarIA(textoFinal, ENUNGUIONES.INFO, {
         ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
       }, estado)
 
@@ -152,7 +152,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
       }
 
-      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
     })
 
     return tools.fallBack()
