@@ -69,14 +69,19 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         }, estado)
         console.log('🔍 [DEBUG] EnviarIA completado, respuesta:', resIA?.respuesta)
 
-        // Esperar un breve momento para asegurar que el estado se actualice
-        await Esperar(100)
+        // Esperar hasta que productoReconocidoPorIA esté disponible (máximo 1 segundo)
+        let productoReconocido = ''
+        for (let i = 0; i < 10; i++) {
+          productoReconocido = state.get('productoReconocidoPorIA') || ''
+          if (productoReconocido) break
+          await Esperar(100)
+          console.log(`🔍 [DEBUG] Intento ${i + 1} para obtener productoReconocidoPorIA: ${productoReconocido}`)
+        }
 
-        const productoReconocido = state.get('productoReconocidoPorIA') || ''
-        console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de EnviarIA:', productoReconocido)
+        console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de espera:', productoReconocido)
 
         // Usar solo productoReconocidoPorIA como textoFinal
-        textoFinal = productoReconocido || '' // Ignorar caption
+        textoFinal = productoReconocido
         console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
         if (!textoFinal) {
@@ -325,6 +330,9 @@ async function obtenerProductosCorrectos(texto, state) {
 }
 
 async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
+  const productoReconocido = state.get('productoReconocidoPorIA') || ''
+  if (productoReconocido) return false // Evitar aclaración para imágenes con producto reconocido
+
   const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
   if (patronesFijos.test(texto)) return true
 
