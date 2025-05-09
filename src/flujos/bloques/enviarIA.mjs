@@ -38,18 +38,23 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       })
     }
 
-    console.log('DEBUG: Objeto enviado a OpenAI:', objeto)
-    funciones.state.clear()
+    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', funciones.state.get())
+    console.log('📤 [EnviarIA] Input para EnviarImagenOpenAI:', { prompt: msj, archivos: imagenes })
+
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
-    console.log('📥 RESPUESTA IA IMAGEN:', res)
+    console.log('📤 [EnviarIA] Respuesta completa de EnviarImagenOpenAI:', res)
 
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
+      console.log('⚠️ [DEBUG] Valor de posibleProducto antes de guardar en state:', posibleProducto)
       await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
-      console.log('🧠 [IA] Producto reconocido en imagen guardado en state:', posibleProducto)
+      console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
     } else {
       console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
+
+    funciones.state.clear()
+    console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state.get())
 
     return res
   }
@@ -136,9 +141,15 @@ function extraerNombreProducto(respuesta = '') {
     const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
     if (entreAsteriscos) return entreAsteriscos[1].trim()
 
-    // Evitar extraer frases completas
+    // Fallback para respuestas cortas y relevantes
+    const palabrasClave = ['té', 'crema', 'yerba', 'ajo', 'vaselina', 'pepinillos']
+    const palabras = respuesta.trim().split(/\s+/)
+    const posibleProducto = palabras.filter(p => palabrasClave.some(k => p.toLowerCase().includes(k))).join(' ')
+    if (posibleProducto && posibleProducto.length > 3) return posibleProducto
+
     return ''
-  } catch {
+  } catch (error) {
+    console.error('❌ [extraerNombreProducto] Error al procesar respuesta:', error)
     return ''
   }
 }
