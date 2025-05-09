@@ -112,34 +112,33 @@ function generateUniqueFileName(extension) {
 // 🧠 EXTRAER POSIBLE NOMBRE DE PRODUCTO DE LA RESPUESTA IA
 function extraerNombreProducto(respuesta = '') {
   try {
-    // Patrones comunes de productos
+    // Patrones comunes de productos, priorizando nombres específicos
     const patrones = [
       /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
-      /el\s+té\s+de\s+([a-záéíóúñ\s]+)/i,
-      /el\s+([a-záéíóúñ\s]+?)\s+(?:no|sí)/i,
-      /(?:tienes|manejan|tienen)\s+(el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
-      /(?:no\s+tengo|no\s+disponible)\s+(.*?)\s+(?:pero|si)/i
+      /el\s+té\s+(?:de\s+)?([a-záéíóúñ\s]+)(?:\s+no\s+|[\.\,\!])/i,
+      /(?:tienes|manejan|tienen)\s+(?:el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
+      /(?:no\s+tengo|no\s+disponible)\s+(.+?)(?:\s+pero|\s+si|[\.\,\!])/i,
+      /el\s+([a-záéíóúñ\s]+?)\s+(?:no\s+está|no\s+tengo|sí)/i
     ]
 
     for (const patron of patrones) {
       const match = respuesta.match(patron)
       if (match) {
-        const resultado = match[1] || match[2]
+        const resultado = match[1]
         if (resultado && resultado.trim().length >= 3) return resultado.trim()
       }
     }
 
+    // Extraer nombres entre comillas o asteriscos
     const entreComillas = respuesta.match(/"(.*?)"/)
     if (entreComillas) return entreComillas[1].trim()
 
     const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
     if (entreAsteriscos) return entreAsteriscos[1].trim()
 
-    const linea = respuesta.split('\n')[0]
-    if (linea.length <= 60) return linea.trim()
-
-    return respuesta.slice(0, 40).trim()
+    // Evitar extraer frases completas
+    return ''
   } catch {
-    return respuesta.trim().slice(0, 40)
+    return ''
   }
 }
