@@ -6,8 +6,19 @@ import { EnviarImagenOpenAI } from '../../APIs/OpenAi/enviarImagenOpenAI.mjs'
 import { convertOggToMp3 } from '../../funciones/convertirMp3.mjs'
 import { EnviarAudioOpenAI } from '../../APIs/OpenAi/enviarAudioOpenAI.mjs'
 
+// Función segura para acceder a state
+const safeGet = (state, key) => {
+  try {
+    return state?.get?.(key) ?? null
+  } catch (error) {
+    console.error(`❌ [safeGet] Error al acceder a ${key}:`, error)
+    return null
+  }
+}
+
 export async function EnviarIA(msj, guion, funciones, estado = {}) {
-  const tipoMensaje = funciones.state ? funciones.state.get('tipoMensaje') : null
+  console.log('🔍 [EnviarIA] Funciones recibidas:', Object.keys(funciones))
+  const tipoMensaje = safeGet(funciones.state, 'tipoMensaje')
   const promptExtra = funciones.promptExtra || ''
 
   const mensajeFinal = promptExtra ? `${promptExtra}\n\n${msj}` : msj
@@ -16,14 +27,13 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
   console.log('📊 [AUDITORIA] Tipo de mensaje:', tipoMensaje)
   console.log('📊 [AUDITORIA] Prompt extra incluido:', !!promptExtra)
   console.log('📊 [AUDITORIA] Estado cliente:', estado)
-  console.log('🔍 [EnviarIA] Contenido de funciones:', funciones)
 
   // --- 📸 IMAGEN ---
   if (tipoMensaje === ENUM_TIPO_ARCHIVO.IMAGEN) {
     console.log('📤 🌄 Enviando imagen a OpenAI...')
     const objeto = { role: 'user', content: [{ type: 'text', text: msj }] }
 
-    const datos = funciones.state ? funciones.state.get('archivos') || [] : []
+    const datos = safeGet(funciones.state, 'archivos') || []
     const imagenes = datos.filter(item => item.tipo === ENUM_TIPO_ARCHIVO.IMAGEN)
     console.log('DEBUG: Imágenes encontradas en state:', imagenes)
 
@@ -38,7 +48,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       })
     }
 
-    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', funciones.state ? funciones.state.get() : 'state no definido')
+    console.log('🔍 [EnviarIA] Estado antes de procesar imagen:', safeGet(funciones.state, null) || 'state no definido')
     console.log('📤 [EnviarIA] Input para EnviarImagenOpenAI:', { prompt: msj, archivos: imagenes })
 
     const res = await EnviarImagenOpenAI(objeto, funciones.ctx.from, guion, estado)
@@ -47,19 +57,19 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
       console.log('⚠️ [DEBUG] Valor de posibleProducto antes de guardar en state:', posibleProducto)
-      if (funciones.state) {
+      if (funciones.state && typeof funciones.state.update === 'function') {
         await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
         console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
       } else {
-        console.error('❌ [EnviarIA] No se pudo actualizar estado: state no definido')
+        console.error('❌ [EnviarIA] No se pudo actualizar estado: state o update no definido')
       }
     } else {
       console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
 
-    if (funciones.state) {
+    if (funciones.state && typeof funciones.state.clear === 'function') {
       funciones.state.clear()
-      console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state.get())
+      console.log('🔍 [EnviarIA] Estado después de clear:', safeGet(funciones.state, null) || 'state no definido')
     }
 
     return res
@@ -69,7 +79,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
   if (tipoMensaje === ENUM_TIPO_ARCHIVO.NOTA_VOZ) {
     console.log('📤 🎵 Enviando nota de voz a OpenAI...')
     const mensaje = []
-    const datos = funciones.state ? funciones.state.get('archivos') || [] : []
+    const datos = safeGet(funciones.state, 'archivos') || []
     const audios = datos.filter(item => item.tipo === ENUM_TIPO_ARCHIVO.NOTA_VOZ)
 
     for (const aud of audios) {
@@ -79,7 +89,9 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       mensaje.push(txt)
     }
 
-    funciones.state.clear()
+    if (funciones.state && typeof funciones.state.clear === 'function') {
+      funciones.state.clear()
+    }
     const final = `${promptExtra}\n${mensaje.join('\n')}`
 
     console.log('🧠 MENSAJE FINAL COMPLETO A LA IA (AUDIO):\n', final)
@@ -88,8 +100,10 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
 
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
-      await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
-      console.log('🧠 [IA] Producto reconocido en audio guardado en state:', posibleProducto)
+      if (funciones.state && typeof funciones.state.update === 'function') {
+        await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
+        console.log('🧠 [IA] Producto reconocido en audio guardado en state:', posibleProducto)
+      }
     }
 
     return res
