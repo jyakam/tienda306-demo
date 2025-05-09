@@ -37,6 +37,49 @@ async function esperarProductoReconocido(state, intentos = 20, delay = 100) {
   return ''
 }
 
+// Función para limpiar productoReconocidoPorIA
+async function limpiarProductoReconocido(state) {
+  await state.update({ productoReconocidoPorIA: '' })
+  console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado.')
+}
+
+// Función para extraer nombre de producto (reutilizada de enviarIA.mjs)
+function extraerNombreProducto(respuesta = '') {
+  try {
+    const patrones = [
+      /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
+      /el\s+té\s+(?:de\s+)?([a-záéíóúñ\s]+)(?:\s+no\s+|[\.\,\!])/i,
+      /(?:tienes|manejan|tienen)\s+(?:el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
+      /(?:no\s+tengo|no\s+disponible)\s+(.+?)(?:\s+pero|\s+si|[\.\,\!])/i,
+      /el\s+([a-záéíóúñ\s]+?)\s+(?:no\s+está|no\s+tengo|sí)/i
+    ]
+
+    for (const patron of patrones) {
+      const match = respuesta.match(patron)
+      if (match) {
+        const resultado = match[1]
+        if (resultado && resultado.trim().length >= 3) return resultado.trim()
+      }
+    }
+
+    const entreComillas = respuesta.match(/"(.*?)"/)
+    if (entreComillas) return entreComillas[1].trim()
+
+    const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
+    if (entreAsteriscos) return entreAsteriscos[1].trim()
+
+    const palabrasClave = ['té', 'crema', 'yerba', 'ajo', 'vaselina', 'pepinillos']
+    const palabras = respuesta.trim().split(/\s+/)
+    const posibleProducto = palabras.filter(p => palabrasClave.some(k => p.toLowerCase().includes(k))).join(' ')
+    if (posibleProducto && posibleProducto.length > 3) return posibleProducto
+
+    return ''
+  } catch (error) {
+    console.error('❌ [extraerNombreProducto] Error al procesar respuesta:', error)
+    return ''
+  }
+}
+
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
@@ -77,18 +120,24 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }, estado)
       console.log('🔍 [DEBUG] EnviarIA completado, respuesta:', resIA?.respuesta)
 
+      // Recargar _productosFull si state fue limpiado por EnviarIA
+      if (!state.get('_productosFull')?.length) {
+        await cargarProductosAlState(state)
+        console.log('📦 [IAINFO] _productosFull recargado después de EnviarIA.')
+      }
+
       // Esperar hasta que productoReconocidoPorIA esté disponible
       const productoReconocido = await esperarProductoReconocido(state)
       console.log('🔍 [DEBUG] productoReconocidoPorIA obtenido después de espera:', productoReconocido)
 
-      // Usar solo productoReconocidoPorIA como textoFinal
-      const textoFinal = productoReconocido
+      // Usar productoReconocidoPorIA, resIA.respuesta o ctx.body como fallback
+      const textoFinal = productoReconocido || extraerNombreProducto(resIA?.respuesta) || ctx.body
       console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
       if (!textoFinal) {
         console.log('🚫 [IAINFO] No se reconoció producto en la imagen, procesando respuesta normal.')
         await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, ctx.body)
-        await state.update({ productoReconocidoPorIA: '' })
+        await limpiarProductoReconocido(state)
         return
       }
 
@@ -110,7 +159,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
           const resIAConProductos = await EnviarIA(textoFinal, ENUNGUIONES.INFO, {
             ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
           }, estado)
-          await manejarRespuestaIA(resIAConProductos, ctx, flowDynamic, gotoFlow, state, textoFinal)
+          if (resIAConProductos) {
+            await manejarRespuestaIA(resIAConProductos, ctx, flowDynamic, gotoFlow, state, textoFinal)
+          } else {
+            console.log('⚠️ [IAINFO] resIAConProductos no válido, usando resIA como fallback.')
+            await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
+          }
         } else {
           await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
         }
@@ -131,8 +185,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
-      await state.update({ productoReconocidoPorIA: '' })
-      console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
+      await limpiarProductoReconocido(state)
       return
     }
 
@@ -176,8 +229,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
-      await state.update({ productoReconocidoPorIA: '' })
-      console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
+      await limpiarProductoReconocido(state)
     })
   })
 
@@ -215,8 +267,6 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', textoFinal)
 
       const productos = await obtenerProductosCorrectos(textoFinal, state)
-      await state.update({ productoReconocidoPorIA: '' })
-
       const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
       if (productos.length) {
@@ -244,8 +294,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
-      await state.update({ productoReconocidoPorIA: '' })
-      console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado al final del proceso.')
+      await limpiarProductoReconocido(state)
     })
 
     return tools.fallBack()
@@ -296,11 +345,9 @@ async function obtenerProductosCorrectos(texto, state) {
   console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
   console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
 
-  // Usar texto directamente, ya es productoReconocidoPorIA para imágenes
   const textoBusqueda = texto
   console.log('🔍 [DEBUG] textoBusqueda para filtrarPorTextoLibre:', textoBusqueda)
 
-  // Forzar nueva búsqueda si hay productoReconocidoPorIA
   if (productoReconocido) {
     console.log('🔍 [IAINFO] Nueva búsqueda con productoReconocidoPorIA, ignorando aclaración.')
     const productosFull = state.get('_productosFull') || []
