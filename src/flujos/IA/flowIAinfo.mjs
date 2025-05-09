@@ -78,7 +78,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         console.log('🧾 [IAINFO] Texto agrupado final para intención:', textoFinal)
 
         // Verificar intención de consulta con el contexto combinado
-        console.log('🔍 [DEBUG] Llamando a obtenerIntencionConsulta con textoFinal:', textoFinal)
+        console.log('🔍 [DEBUG] Texto enviado a obtenerIntencionConsulta:', textoFinal)
         const { esConsultaProductos } = await obtenerIntencionConsulta(textoFinal, state.get('ultimaConsulta') || '')
         console.log('📡 [IAINFO] Resultado de obtenerIntencionConsulta:', { esConsultaProductos })
 
