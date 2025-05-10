@@ -6,6 +6,7 @@ import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'
 import { EnviarImagenOpenAI } from '../../APIs/OpenAi/enviarImagenOpenAI.mjs'
 import { convertOggToMp3 } from '../../funciones/convertirMp3.mjs'
 import { EnviarAudioOpenAI } from '../../APIs/OpenAi/enviarAudioOpenAI.mjs'
+import { extraerNombreProducto } from '../../funciones/helpers/extractNombreProducto.mjs'
 
 // Función segura para acceder a state
 const safeGet = (state, key) => {
@@ -44,14 +45,19 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     console.log('DEBUG: Imágenes encontradas en state:', imagenes)
 
     for (const img of imagenes) {
-      const imagenBase64 = fs.readFileSync(img.ruta, { encoding: 'base64' })
-      objeto.content.push({
-        type: 'image_url',
-        image_url: {
-          url: `data:image/jpeg;base64,${imagenBase64}`,
-          detail: BOT.CALIDA_IMAGENES
-        }
-      })
+      try {
+        const imagenBase64 = fs.readFileSync(img.ruta, { encoding: 'base64' })
+        objeto.content.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:image/jpeg;base64,${imagenBase64}`,
+            detail: BOT.CALIDAD_IMAGENES
+          }
+        })
+      } catch (error) {
+        console.error(`❌ [EnviarIA] Error al leer imagen ${img.ruta}:`, error)
+        continue
+      }
     }
 
     console.log('📤 [EnviarIA] Input para EnviarImagenOpenAI:', { prompt: msj, archivos: imagenes })
@@ -66,7 +72,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
         tipoMensaje: safeGet(funciones.state, 'tipoMensaje'),
         productoReconocidoPorIA: safeGet(funciones.state, 'productoReconocidoPorIA')
       })
-      if (funciones.state && typeof funciones.state.update === 'function') {
+      if (typeof funciones.state?.update === 'function') {
         await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
         console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
         console.log('🔍 [DEBUG] Estado después de actualizar productoReconocidoPorIA:', {
@@ -79,12 +85,6 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     } else {
       console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
-
-    // Comentado para evitar limpiar tipoMensaje
-    // if (funciones.state && typeof funciones.state.clear === 'function') {
-    //   funciones.state.clear()
-    //   console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state ? 'definido' : 'no definido')
-    // }
 
     return res
   }
@@ -100,14 +100,10 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       const id = generateUniqueFileName('mp3')
       const mp3 = await convertOggToMp3(aud.ruta, id, BOT.VELOCIDAD)
       const txt = await EnviarAudioOpenAI(mp3)
-      mensaje.push(txt)
+      if (txt) mensaje.push(txt)
     }
 
-    // Comentado para evitar limpiar tipoMensaje
-    // if (funciones.state && typeof funciones.state.clear === 'function') {
-    //   funciones.state.clear()
-    // }
-    const final = `${promptExtra}\n${mensaje.join('\n')}`
+    const final = `${promptExtra}\n${mensaje.filter(Boolean).join('\n')}`
 
     console.log('🧠 MENSAJE FINAL COMPLETO A LA IA (AUDIO):\n', final)
     const res = await EnviarTextoOpenAI(final, funciones.ctx.from, guion, estado)
@@ -115,7 +111,7 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
 
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
-      if (funciones.state && typeof funciones.state.update === 'function') {
+      if (typeof funciones.state?.update === 'function') {
         await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
         console.log('🧠 [IA] Producto reconocido en audio guardado en state:', posibleProducto)
       }
@@ -147,44 +143,4 @@ function generateUniqueFileName(extension) {
   const timestamp = Date.now()
   const randomNumber = Math.floor(Math.random() * 1000)
   return `file_${timestamp}_${randomNumber}.${extension}`
-}
-
-// 🧠 EXTRAER POSIBLE NOMBRE DE PRODUCTO DE LA RESPUESTA IA
-function extraerNombreProducto(respuesta = '') {
-  try {
-    // Patrones comunes de productos, priorizando nombres específicos
-    const patrones = [
-      /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
-      /el\s+té\s+(?:de\s+)?([a-záéíóúñ\s]+)(?:\s+no\s+|[\.\,\!])/i,
-      /(?:tienes|manejan|tienen)\s+(?:el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
-      /(?:no\s+tengo|no\s+disponible)\s+(.+?)(?:\s+pero|\s+si|[\.\,\!])/i,
-      /el\s+([a-záéíóúñ\s]+?)\s+(?:no\s+está|no\s+tengo|sí)/i
-    ]
-
-    for (const patron of patrones) {
-      const match = respuesta.match(patron)
-      if (match) {
-        const resultado = match[1]
-        if (resultado && resultado.trim().length >= 3) return resultado.trim()
-      }
-    }
-
-    // Extraer nombres entre comillas o asteriscos
-    const entreComillas = respuesta.match(/"(.*?)"/)
-    if (entreComillas) return entreComillas[1].trim()
-
-    const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
-    if (entreAsteriscos) return entreAsteriscos[1].trim()
-
-    // Fallback para respuestas cortas y relevantes
-    const palabrasClave = ['té', 'crema', 'yerba', 'ajo', 'vaselina', 'pepinillos']
-    const palabras = respuesta.trim().split(/\s+/)
-    const posibleProducto = palabras.filter(p => palabrasClave.some(k => p.toLowerCase().includes(k))).join(' ')
-    if (posibleProducto && posibleProducto.length > 3) return posibleProducto
-
-    return ''
-  } catch (error) {
-    console.error('❌ [extraerNombreProducto] Error al procesar respuesta:', error)
-    return ''
-  }
 }
