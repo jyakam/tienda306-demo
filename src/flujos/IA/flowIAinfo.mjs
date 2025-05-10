@@ -18,12 +18,14 @@ import { filtrarPorTextoLibre } from '../../funciones/helpers/filtrarPorTextoLib
 import { generarContextoProductosIA } from '../../funciones/helpers/generarContextoProductosIA.mjs'
 import { flowProductos } from '../flowProductos.mjs'
 import { flowDetallesProducto } from '../flowDetallesProducto.mjs'
-import { ActualizarFechasContacto, ActualizarResumenUltimaConversacion } from '../../funciones/helpers/contactosSheetHelper.mjs'
+import { ActualizarFechasContacto } from '../../funciones/helpers/contactosSheetHelper.mjs'
 import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
-import { generarResumenConversacionIA } from '../../funciones/helpers/generarResumenConversacionIA.mjs'
 import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorProductos.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
 import { flowIAImagen } from './flowIAImagen.mjs'
+import { extraerNombreProducto } from '../../funciones/helpers/extractNombreProducto.mjs'
+
+console.log('🚀 [IAINFO] Cargando flowIAinfo.mjs...')
 
 // Función para esperar productoReconocidoPorIA
 async function esperarProductoReconocido(state, intentos = 20, delay = 100) {
@@ -43,43 +45,6 @@ async function esperarProductoReconocido(state, intentos = 20, delay = 100) {
 async function limpiarProductoReconocido(state) {
   await state.update({ productoReconocidoPorIA: '' })
   console.log('🧹 [IAINFO] productoReconocidoPorIA limpiado.')
-}
-
-// Función para extraer nombre de producto
-function extraerNombreProducto(respuesta = '') {
-  try {
-    const patrones = [
-      /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
-      /el\s+té\s+(?:de\s+)?([a-záéíóúñ\s]+)(?:\s+no\s+|[\.\,\!])/i,
-      /(?:tienes|manejan|tienen)\s+(?:el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
-      /(?:no\s+tengo|no\s+disponible)\s+(.+?)(?:\s+pero|\s+si|[\.\,\!])/i,
-      /el\s+([a-záéíóúñ\s]+?)\s+(?:no\s+está|no\s+tengo|sí)/i
-    ]
-
-    for (const patron of patrones) {
-      const match = respuesta.match(patron)
-      if (match) {
-        const resultado = match[1]
-        if (resultado && resultado.trim().length >= 3) return resultado.trim()
-      }
-    }
-
-    const entreComillas = respuesta.match(/"(.*?)"/)
-    if (entreComillas) return entreComillas[1].trim()
-
-    const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
-    if (entreAsteriscos) return entreAsteriscos[1].trim()
-
-    const palabrasClave = ['té', 'crema', 'yerba', 'ajo', 'vaselina', 'pepinillos']
-    const palabras = respuesta.trim().split(/\s+/)
-    const posibleProducto = palabras.filter(p => palabrasClave.some(k => p.toLowerCase().includes(k))).join(' ')
-    if (posibleProducto && posibleProducto.length > 3) return posibleProducto
-
-    return ''
-  } catch (error) {
-    console.error('❌ [extraerNombreProducto] Error al procesar respuesta:', error)
-    return ''
-  }
 }
 
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
@@ -148,14 +113,9 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, ctx.body)
 
       const datosExtraidos = await extraerDatosContactoIA(ctx.body, phone)
-      const resumen = await generarResumenConversacionIA(ctx.body, phone)
       if (Object.keys(datosExtraidos).length > 0) {
         await ActualizarContacto(phone, datosExtraidos)
         console.log('📇 [IAINFO] Datos de contacto actualizados:', datosExtraidos)
-      }
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-        console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
       await limpiarProductoReconocido(state)
@@ -193,14 +153,9 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('📥 [IAINFO] Respuesta completa recibida de IA:', res?.respuesta)
 
       const datosExtraidos = await extraerDatosContactoIA(txt, phone)
-      const resumen = await generarResumenConversacionIA(txt, phone)
       if (Object.keys(datosExtraidos).length > 0) {
         await ActualizarContacto(phone, datosExtraidos)
         console.log('📇 [IAINFO] Datos de contacto actualizados:', datosExtraidos)
-      }
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-        console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
@@ -264,14 +219,9 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, ctx.body)
 
       const datosExtraidos = await extraerDatosContactoIA(ctx.body, phone)
-      const resumen = await generarResumenConversacionIA(ctx.body, phone)
       if (Object.keys(datosExtraidos).length > 0) {
         await ActualizarContacto(phone, datosExtraidos)
         console.log('📇 [IAINFO] Datos de contacto actualizados:', datosExtraidos)
-      }
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-        console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
       await limpiarProductoReconocido(state)
@@ -309,11 +259,6 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       const datosCombinados = { ...datos, ...datosExtraidos }
       if (Object.keys(datosCombinados).length > 0) {
         await ActualizarContacto(phone, datosCombinados)
-      }
-
-      const resumen = await generarResumenConversacionIA(txt, phone)
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, textoFinal)
