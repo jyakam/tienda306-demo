@@ -1,33 +1,34 @@
 // src/funciones/helpers/extractNombreProducto.mjs
-export function extraerNombreProducto(respuesta = '') {
-  try {
-    const patrones = [
-      /el\s+producto\s+(?:llamado\s+)?(.+?)(?:\s+no\s+|[\.\,\!])/i,
-      /el\s+té\s+(?:de\s+)?([a-záéíóúñ\s]+)(?:\s+no\s+|[\.\,\!])/i,
-      /(?:tienes|manejan|tienen)\s+(?:el\s+)?([a-záéíóúñ\s]+)(?:\?|\.)/i,
-      /(?:no\s+tengo|no\s+disponible)\s+(.+?)(?:\s+pero|\s+si|[\.\,\!])/i,
-      /el\s+([a-záéíóúñ\s]+?)\s+(?:no\s+está|no\s+tengo|sí)/i
-    ]
+import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'
 
-    for (const patron of patrones) {
-      const match = respuesta.match(patron)
-      if (match) {
-        const resultado = match[1]
-        if (resultado && resultado.trim().length >= 3) return resultado.trim()
-      }
+export async function extraerNombreProducto(respuesta = '') {
+  try {
+    if (!respuesta.trim()) return ''
+
+    // Prompt para OpenAI que detecta el nombre del producto en cualquier idioma y contexto
+    const prompt = `
+      Dado el siguiente texto, identifica el nombre del producto mencionado, si lo hay. 
+      El texto puede estar en cualquier idioma y puede incluir preguntas sobre precio, tamaño, sabores, preparación, etc.
+      Devuelve solo el nombre del producto (sin descripciones ni detalles adicionales). 
+      Si no se menciona un producto, devuelve una cadena vacía.
+      
+      Texto: "${respuesta}"
+      
+      Respuesta esperada: <nombre del producto o "" si no hay producto>
+    `
+
+    // Enviar el prompt a OpenAI
+    const res = await EnviarTextoOpenAI(prompt, 'system', 'PRODUCTO', {})
+    const nombreProducto = res?.respuesta?.trim() || ''
+    const cleanResult = nombreProducto.replace(/^["']|["']$/g, '').trim()
+
+    // Validar que el resultado sea razonable (mínimo 3, máximo 100 caracteres)
+    if (cleanResult.length >= 3 && cleanResult.length <= 100) {
+      console.log(`✅ [extractNombreProducto] Producto detectado: ${cleanResult}`)
+      return cleanResult
     }
 
-    const entreComillas = respuesta.match(/"(.*?)"/)
-    if (entreComillas) return entreComillas[1].trim()
-
-    const entreAsteriscos = respuesta.match(/\*(.*?)\*/)
-    if (entreAsteriscos) return entreAsteriscos[1].trim()
-
-    const palabrasClave = ['té', 'crema', 'yerba', 'ajo', 'vaselina', 'pepinillos']
-    const palabras = respuesta.trim().split(/\s+/)
-    const posibleProducto = palabras.filter(p => palabrasClave.some(k => p.toLowerCase().includes(k))).join(' ')
-    if (posibleProducto && posibleProducto.length > 3) return posibleProducto
-
+    console.log('⚠️ [extractNombreProducto] No se detectó producto en:', respuesta)
     return ''
   } catch (error) {
     console.error('❌ [extractNombreProducto] Error al procesar respuesta:', error)
