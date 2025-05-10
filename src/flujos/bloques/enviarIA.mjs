@@ -1,3 +1,4 @@
+// src/flujos/bloques/enviarIA.mjs
 import fs from 'fs'
 import { BOT } from '../../config/bot.mjs'
 import { ENUM_TIPO_ARCHIVO } from './detectarArchivos.mjs'
@@ -61,9 +62,17 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
     if (res?.respuesta) {
       const posibleProducto = extraerNombreProducto(res.respuesta)
       console.log('⚠️ [DEBUG] Valor de posibleProducto antes de guardar en state:', posibleProducto)
+      console.log('🔍 [DEBUG] Estado antes de actualizar productoReconocidoPorIA:', {
+        tipoMensaje: safeGet(funciones.state, 'tipoMensaje'),
+        productoReconocidoPorIA: safeGet(funciones.state, 'productoReconocidoPorIA')
+      })
       if (funciones.state && typeof funciones.state.update === 'function') {
         await funciones.state.update({ productoReconocidoPorIA: posibleProducto })
         console.log('✅ [EnviarIA] Estado actualizado con productoReconocidoPorIA:', posibleProducto)
+        console.log('🔍 [DEBUG] Estado después de actualizar productoReconocidoPorIA:', {
+          tipoMensaje: safeGet(funciones.state, 'tipoMensaje'),
+          productoReconocidoPorIA: safeGet(funciones.state, 'productoReconocidoPorIA')
+        })
       } else {
         console.error('❌ [EnviarIA] No se pudo actualizar estado: state o update no definido')
       }
@@ -71,10 +80,11 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       console.log('DEBUG: No se recibió respuesta válida de OpenAI:', res)
     }
 
-    if (funciones.state && typeof funciones.state.clear === 'function') {
-      funciones.state.clear()
-      console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state ? 'definido' : 'no definido')
-    }
+    // Comentado para evitar limpiar tipoMensaje
+    // if (funciones.state && typeof funciones.state.clear === 'function') {
+    //   funciones.state.clear()
+    //   console.log('🔍 [EnviarIA] Estado después de clear:', funciones.state ? 'definido' : 'no definido')
+    // }
 
     return res
   }
@@ -93,9 +103,10 @@ export async function EnviarIA(msj, guion, funciones, estado = {}) {
       mensaje.push(txt)
     }
 
-    if (funciones.state && typeof funciones.state.clear === 'function') {
-      funciones.state.clear()
-    }
+    // Comentado para evitar limpiar tipoMensaje
+    // if (funciones.state && typeof funciones.state.clear === 'function') {
+    //   funciones.state.clear()
+    // }
     const final = `${promptExtra}\n${mensaje.join('\n')}`
 
     console.log('🧠 MENSAJE FINAL COMPLETO A LA IA (AUDIO):\n', final)
