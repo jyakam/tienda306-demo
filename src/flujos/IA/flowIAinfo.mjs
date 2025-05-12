@@ -1,4 +1,3 @@
-// src/flujos/IA/flowIAinfo.mjs
 import 'dotenv/config'
 import { addKeyword, EVENTS } from '@builderbot/bot'
 import { ActualizarContacto } from '../../config/contactos.mjs'
@@ -18,12 +17,14 @@ import { filtrarPorTextoLibre } from '../../funciones/helpers/filtrarPorTextoLib
 import { generarContextoProductosIA } from '../../funciones/helpers/generarContextoProductosIA.mjs'
 import { flowProductos } from '../flowProductos.mjs'
 import { flowDetallesProducto } from '../flowDetallesProducto.mjs'
-
 import { ActualizarFechasContacto, ActualizarResumenUltimaConversacion } from '../../funciones/helpers/contactosSheetHelper.mjs'
 import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
 import { generarResumenConversacionIA } from '../../funciones/helpers/generarResumenConversacion.mjs'
 import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorProductos.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
+
+// 👇 NUEVO: importar helper para imágenes productos
+import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
 
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
@@ -46,7 +47,25 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('📦 [IAINFO] Productos cargados en cache para:', phone)
     }
 
+    // 👇 NUEVO: limpiar flags de imágenes
+    await state.update({
+      productoDetectadoEnImagen: false,
+      productoReconocidoPorIA: ''
+    })
+
     const detectar = await DetectarArchivos(ctx, state)
+
+    // 👇 NUEVO: si el mensaje contiene imagen, intentar identificar producto
+    if (state.get('tipoMensaje') === 1) {
+      const resultado = await enviarImagenProductoOpenAI(ctx.file)
+      if (resultado && resultado !== '' && resultado !== 'No es un producto') {
+        await state.update({
+          productoDetectadoEnImagen: true,
+          productoReconocidoPorIA: resultado
+        })
+        console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
+      }
+    }
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
 
@@ -83,15 +102,26 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+
+      // 👇 NUEVO: limpiar flags después de la interacción
+      await state.update({
+        productoDetectadoEnImagen: false,
+        productoReconocidoPorIA: ''
+      })
     })
   })
-
   .addAction({ capture: true }, async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
     const message = ctx.body.trim()
     const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone) || {}
     const datos = {}
+
+    // 👇 NUEVO: limpieza previa
+    await state.update({
+      productoDetectadoEnImagen: false,
+      productoReconocidoPorIA: ''
+    })
 
     if (/me llamo|mi nombre es/i.test(message)) {
       const nombre = message.split(/me llamo|mi nombre es/i)[1]?.trim()
@@ -109,6 +139,19 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     }
 
     const detectar = await DetectarArchivos(ctx, state)
+
+    // 👇 NUEVO: si contiene imagen
+    if (state.get('tipoMensaje') === 1) {
+      const resultado = await enviarImagenProductoOpenAI(ctx.file)
+      if (resultado && resultado !== '' && resultado !== 'No es un producto') {
+        await state.update({
+          productoDetectadoEnImagen: true,
+          productoReconocidoPorIA: resultado
+        })
+        console.log(`🖼️ [IAINFO] Producto detectado en imagen (continuación): ${resultado}`)
+      }
+    }
+
     AgruparMensaje(detectar, async (txt) => {
       if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
       reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
@@ -144,6 +187,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+
+      // 👇 NUEVO: limpieza final
+      await state.update({
+        productoDetectadoEnImagen: false,
+        productoReconocidoPorIA: ''
+      })
     })
 
     return tools.fallBack()
@@ -192,6 +241,13 @@ async function obtenerProductosCorrectos(texto, state) {
   const sugeridos = state.get('productosUltimaSugerencia') || []
   console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
 
+  // 👇 NUEVO: si se detectó producto por imagen, se busca directamente
+  if (state.get('productoDetectadoEnImagen') && state.get('productoReconocidoPorIA')) {
+    const productosFull = state.get('_productosFull') || []
+    console.log(`🔍 [IAINFO] Buscando producto por imagen detectada: ${state.get('productoReconocidoPorIA')}`)
+    return filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
+  }
+
   if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
     return filtrarPorTextoLibre(sugeridos, texto)
@@ -203,7 +259,7 @@ async function obtenerProductosCorrectos(texto, state) {
     return filtrarPorTextoLibre(productosFull, texto)
   }
 
-  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
+  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '', state)
   if (esConsultaProductos) {
     console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
     const productosFull = state.get('_productosFull') || []
