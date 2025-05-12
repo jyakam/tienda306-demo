@@ -17,8 +17,8 @@ export async function extraerNombreProducto(respuesta = '') {
       Respuesta esperada: <nombre del producto o "" si no hay producto>
     `
 
-    // Enviar el prompt a OpenAI
-    const res = await EnviarTextoOpenAI(prompt, 'system', 'PRODUCTO', {})
+    // Enviar el prompt a OpenAI con guion explícito
+    const res = await EnviarTextoOpenAI(prompt, 'system', { system: 'Eres un asistente que identifica nombres de productos.' }, {})
     const nombreProducto = res?.respuesta?.trim() || ''
     const cleanResult = nombreProducto.replace(/^["']|["']$/g, '').trim()
 
