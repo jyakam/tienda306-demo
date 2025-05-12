@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import fs from 'fs'
 import { addKeyword, EVENTS } from '@builderbot/bot'
 import { ActualizarContacto } from '../../config/contactos.mjs'
 import { CONTACTOS, BOT } from '../../config/bot.mjs'
@@ -57,7 +58,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     // 👇 NUEVO: si el mensaje contiene imagen, intentar identificar producto
     if (state.get('tipoMensaje') === 1) {
-      const resultado = await enviarImagenProductoOpenAI(ctx.file)
+      const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
+let resultado = ''
+if (imagenes?.length > 0) {
+    const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+    resultado = await enviarImagenProductoOpenAI(fileBuffer)
+}
       if (resultado && resultado !== '' && resultado !== 'No es un producto') {
         await state.update({
           productoDetectadoEnImagen: true,
@@ -142,7 +148,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     // 👇 NUEVO: si contiene imagen
     if (state.get('tipoMensaje') === 1) {
-      const resultado = await enviarImagenProductoOpenAI(ctx.file)
+      const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
+let resultado = ''
+if (imagenes?.length > 0) {
+    const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+    resultado = await enviarImagenProductoOpenAI(fileBuffer)
+}
       if (resultado && resultado !== '' && resultado !== 'No es un producto') {
         await state.update({
           productoDetectadoEnImagen: true,
