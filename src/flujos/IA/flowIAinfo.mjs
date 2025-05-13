@@ -254,10 +254,15 @@ async function obtenerProductosCorrectos(texto, state) {
 
   // 👇 NUEVO: si se detectó producto por imagen, se busca directamente
   if (state.get('productoDetectadoEnImagen') && state.get('productoReconocidoPorIA')) {
-    const productosFull = state.get('_productosFull') || []
-    console.log(`🔍 [IAINFO] Buscando producto por imagen detectada: ${state.get('productoReconocidoPorIA')}`)
-    return filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
-  }
+        const productosFull = state.get('_productosFull') || []
+        let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
+
+        if (!productos.length) {
+            const traduccion = await traducirTexto(state.get('productoReconocidoPorIA'))
+            productos = filtrarPorTextoLibre(productosFull, traduccion)
+        }
+        return productos
+    }
 
   if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
