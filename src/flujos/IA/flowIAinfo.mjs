@@ -231,11 +231,13 @@ async function obtenerProductosCorrectos(texto, state) {
 
   if (state.get('productoDetectadoEnImagen') && state.get('productoReconocidoPorIA')) {
     const productosFull = state.get('_productosFull') || []
-    let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
+  let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
 
-    // 👇 NUEVO: si no hubo coincidencias, probar equivalencia IA con cada producto
-if (!productos.length) {
-  console.log('🔎 [IAINFO] No se encontraron coincidencias directas. Intentando equivalencia IA...')
+const mejorScore = productos.length ? Math.max(...productos.map(p => p.score || 0)) : 0
+
+// 👇 NUEVO v6: si no hubo coincidencias o el mejor score es bajo, probar equivalencia IA
+if (!productos.length || mejorScore < 18) {
+  console.log(`🔎 [IAINFO] Coincidencias insuficientes (score máximo ${mejorScore}). Intentando equivalencia IA...`)
   for (const producto of productosFull) {
     const esSimilar = await esProductoSimilarPorIA(producto.NOMBRE, state.get('productoReconocidoPorIA'))
     if (esSimilar) {
