@@ -160,46 +160,50 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 }
 
     AgruparMensaje(detectar, async (txt) => {
-      if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
-      reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
-      Escribiendo(ctx)
+    if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
+    reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
+    Escribiendo(ctx)
 
-      console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', txt)
+    console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', txt)
 
-      const productos = await obtenerProductosCorrectos(txt, state)
-      const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
+    const productos = await obtenerProductosCorrectos(txt, state)
+    const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
-      if (productos.length) {
+    if (productos.length) {
         await state.update({ productosUltimaSugerencia: productos })
-      }
+    }
 
-      const estado = {
+    const estado = {
         esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
         contacto: { ...contacto, ...datos }
-      }
+    }
 
-      const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
+    const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
         ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
-      }, estado)
+    }, estado)
 
-      const datosExtraidos = await extraerDatosContactoIA(txt, phone)
-      const datosCombinados = { ...datos, ...datosExtraidos }
-      if (Object.keys(datosCombinados).length > 0) {
-        await ActualizarContacto(phone, datosCombinados)
-      }
+    const esDatosContacto = await detectarSiEsMensajeDeContacto(txt)
 
-      const resumen = await generarResumenConversacionIA(txt, phone)
-      if (resumen) {
+    if (esDatosContacto) {
+        const datosExtraidos = await extraerDatosContactoIA(txt, phone)
+        const datosCombinados = { ...datos, ...datosExtraidos }
+        if (Object.keys(datosCombinados).length > 0) {
+            await ActualizarContacto(phone, datosCombinados)
+        }
+    }
+
+    const resumen = await generarResumenConversacionIA(txt, phone)
+    if (resumen) {
         await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-      }
+    }
 
-      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+    await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
-      await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
-    })
+    await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
+})
 
-    return tools.fallBack()
-  })
+return tools.fallBack()
+})
 
 async function manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt) {
   const respuestaIA = res.respuesta?.toLowerCase?.() || ''
