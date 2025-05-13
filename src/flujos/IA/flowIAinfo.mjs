@@ -182,15 +182,15 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
     }, estado)
 
-    const esDatosContacto = await detectarSiEsMensajeDeContacto(txt)
+    const esDatosContacto = await detectarIntencionContactoIA(txt)
 
-    if (esDatosContacto) {
-        const datosExtraidos = await extraerDatosContactoIA(txt, phone)
-        const datosCombinados = { ...datos, ...datosExtraidos }
-        if (Object.keys(datosCombinados).length > 0) {
-            await ActualizarContacto(phone, datosCombinados)
-        }
+if (esDatosContacto) {
+    const datosExtraidos = await extraerDatosContactoIA(txt, phone)
+    const datosCombinados = { ...datos, ...datosExtraidos }
+    if (Object.keys(datosCombinados).length > 0) {
+        await ActualizarContacto(phone, datosCombinados)
     }
+}
 
     const resumen = await generarResumenConversacionIA(txt, phone)
     if (resumen) {
@@ -377,11 +377,28 @@ function encontroProductoExacto(productos, nombreBuscado) {
     return porcentaje >= 0.7
   })
 }
-async function detectarSiEsMensajeDeContacto(txt) {
-    const patrones = [
-        'nombre', 'teléfono', 'telefono', 'dirección', 'direccion',
-        'email', 'correo', 'ciudad', 'país', 'pais',
-        'identificación', 'identificacion', 'cumpleaños', 'cumpleanos'
-    ]
-    return patrones.some(palabra => txt.toLowerCase().includes(palabra))
+import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'   // 👈 ya la tienes seguro, si no agrégala arriba
+
+async function detectarIntencionContactoIA(txt) {
+    const prompt = `
+Eres un asistente experto. Tu tarea es decir si el siguiente mensaje del usuario tiene la intención de entregarte datos personales como nombre, teléfono, email, dirección o cualquier dato de contacto. 
+
+Mensaje del usuario:
+"${txt}"
+
+Responde solamente este JSON:
+{
+  "esDatosContacto": true o false
 }
+`.trim()
+
+    try {
+        const respuesta = await EnviarTextoOpenAI(prompt, 'intencionContacto', 'INFO', {})
+        const parsed = JSON.parse(respuesta.respuesta || '{}')
+        return parsed.esDatosContacto || false
+    } catch (e) {
+        console.log('❌ [IAINFO] Error detectando intención de contacto por IA:', e)
+        return false
+    }
+}
+
