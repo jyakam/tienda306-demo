@@ -250,17 +250,22 @@ async function obtenerProductosCorrectos(texto, state) {
 
 const mejorScore = productos.length ? Math.max(...productos.map(p => p.score || 0)) : 0
 
-// 👇 NUEVO v6: si no hubo coincidencias o el mejor score es bajo, probar equivalencia IA
-if (!productos.length || mejorScore < 18) {
-  console.log(`🔎 [IAINFO] Coincidencias insuficientes (score máximo ${mejorScore}). Intentando equivalencia IA...`)
-  for (const producto of productosFull) {
-    const esSimilar = await esProductoSimilarPorIA(producto.NOMBRE, state.get('productoReconocidoPorIA'))
-    if (esSimilar) {
-      productos = [producto]
-      console.log(`✅ [IAINFO] Equivalencia IA encontrada: ${producto.NOMBRE}`)
-      break
+// 👇 NUEVO: lógica optimizada IA solo si ningún producto pasa de 25
+if (mejorScore < 25 && productos.length) {
+    console.log(`🔎 [IAINFO] Mejor score encontrado: ${mejorScore}. Se probarán equivalencias IA en los top 15 productos.`)
+    // ordenar productos por score descendente
+    const topProductos = productos
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 15)
+
+    for (const producto of topProductos) {
+        const esSimilar = await esProductoSimilarPorIA(producto.NOMBRE, state.get('productoReconocidoPorIA'))
+        if (esSimilar) {
+            productos = [producto]
+            console.log(`✅ [IAINFO] Equivalencia IA encontrada: ${producto.NOMBRE}`)
+            break
+        }
     }
-  }
 }
     
     console.log(`🔍 [IAINFO] Buscando producto por imagen detectada: ${state.get('productoReconocidoPorIA')}`)
