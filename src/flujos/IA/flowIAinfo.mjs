@@ -23,6 +23,7 @@ import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.m
 import { generarResumenConversacionIA } from '../../funciones/helpers/generarResumenConversacion.mjs'
 import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorProductos.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
+import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
 
 // 👇 NUEVO: importar helper para imágenes productos
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
