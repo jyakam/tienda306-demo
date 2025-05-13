@@ -255,15 +255,38 @@ async function obtenerProductosCorrectos(texto, state) {
 
   // 👇 NUEVO: si se detectó producto por imagen, se busca directamente
   if (state.get('productoDetectadoEnImagen') && state.get('productoReconocidoPorIA')) {
-        const productosFull = state.get('_productosFull') || []
-        let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
+    const productosFull = state.get('_productosFull') || []
+    let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
 
-        if (!productos.length) {
-            const traduccion = await traducirTexto(state.get('productoReconocidoPorIA'))
-            productos = filtrarPorTextoLibre(productosFull, traduccion)
-        }
-        return productos
+    // 👇 NUEVO: si no hay productos o ninguno es suficientemente exacto, intenta traducir
+    if (!productos.length || !encontroProductoExacto(productos, state.get('productoReconocidoPorIA'))) {
+      const traduccion = await traducirTexto(state.get('productoReconocidoPorIA'))
+      productos = filtrarPorTextoLibre(productosFull, traduccion)
     }
+    return productos
+  }
+
+  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
+    console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
+    return filtrarPorTextoLibre(sugeridos, texto)
+  }
+
+  if (await esMensajeRelacionadoAProducto(texto, state)) {
+    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
+    const productosFull = state.get('_productosFull') || []
+    return filtrarPorTextoLibre(productosFull, texto)
+  }
+
+  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '', state)
+  if (esConsultaProductos) {
+    console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
+    const productosFull = state.get('_productosFull') || []
+    return filtrarPorTextoLibre(productosFull, texto)
+  }
+
+  console.log('🚫 [IAINFO] No se detectó relación con productos.')
+  return []
+}
 
   if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
     console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
@@ -294,4 +317,13 @@ async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
   const ultimaConsulta = (state.get('ultimaConsulta') || '').toLowerCase()
   const textoLower = texto.toLowerCase()
   return ultimaConsulta && textoLower.length <= 12 && !textoLower.includes('hola') && textoLower.length >= 3
+}
+function encontroProductoExacto(productos, nombreBuscado) {
+  const nombreLimpio = nombreBuscado.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/)
+  return productos.some(p => {
+    const productoLimpio = p.NOMBRE.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/)
+    const coincidencias = nombreLimpio.filter(palabra => productoLimpio.includes(palabra)).length
+    const porcentaje = coincidencias / nombreLimpio.length
+    return porcentaje >= 0.7 // puedes subir o bajar este valor si quieres ser más estricto o más flexible
+  })
 }
