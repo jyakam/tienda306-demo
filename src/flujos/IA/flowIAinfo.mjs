@@ -258,11 +258,16 @@ async function obtenerProductosCorrectos(texto, state) {
     const productosFull = state.get('_productosFull') || []
     let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
 
+    console.log(`🔍 [IAINFO] Buscando producto por imagen detectada: ${state.get('productoReconocidoPorIA')}`)
+    
     // 👇 NUEVO: si no hay productos o ninguno es suficientemente exacto, intenta traducir
     if (!productos.length || !encontroProductoExacto(productos, state.get('productoReconocidoPorIA'))) {
+      console.log('🔎 [IAINFO] No se encontró producto exacto, intentando traducción...')
       const traduccion = await traducirTexto(state.get('productoReconocidoPorIA'))
       productos = filtrarPorTextoLibre(productosFull, traduccion)
+      console.log(`🔎 [IAINFO] Resultado después de traducción: ${productos.length} productos encontrados.`)
     }
+
     return productos
   }
 
