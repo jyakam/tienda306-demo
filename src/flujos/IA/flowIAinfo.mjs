@@ -302,6 +302,33 @@ Responde solamente este JSON:
   }
 }
 
+async function esProductoSimilarPorIA(nombreProducto, textoConsulta) {
+  const prompt = `
+Eres un asistente experto en e-commerce. 
+Tu tarea es determinar si las dos frases siguientes hacen referencia al mismo producto, teniendo en cuenta posibles errores de ortografía, sinónimos, traducciones o abreviaciones.
+
+Frase 1 (producto del catálogo):
+"${nombreProducto}"
+
+Frase 2 (consulta del cliente):
+"${textoConsulta}"
+
+Responde solamente este JSON:
+{
+  "esSimilar": true o false
+}
+  `.trim()
+
+  try {
+    const respuesta = await EnviarTextoOpenAI(prompt, 'similaridad', 'INFO', {})
+    const parsed = JSON.parse(respuesta.respuesta || '{}')
+    return parsed.esSimilar || false
+  } catch (e) {
+    console.log('❌ [IAINFO] Error verificando equivalencia de producto:', e)
+    return false
+  }
+}
+
 function encontroProductoExacto(productos, nombreBuscado) {
   const nombreLimpio = nombreBuscado.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/)
   return productos.some(p => {
