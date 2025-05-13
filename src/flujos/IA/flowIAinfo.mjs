@@ -24,8 +24,6 @@ import { generarResumenConversacionIA } from '../../funciones/helpers/generarRes
 import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorProductos.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
 import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
-
-// 👇 NUEVO: importar helper para imágenes productos
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
 
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
@@ -49,30 +47,23 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       console.log('📦 [IAINFO] Productos cargados en cache para:', phone)
     }
 
-    // 👇 NUEVO: limpiar flags de imágenes
-    await state.update({
-      productoDetectadoEnImagen: false,
-      productoReconocidoPorIA: ''
-    })
+    await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
 
     const detectar = await DetectarArchivos(ctx, state)
 
-    // 👇 NUEVO: si el mensaje contiene imagen, intentar identificar producto
     if (state.get('tipoMensaje') === 1) {
       const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
-let resultado = ''
-if (imagenes?.length > 0) {
-    const fileBuffer = fs.readFileSync(imagenes[0].ruta)
-    resultado = await enviarImagenProductoOpenAI(fileBuffer)
-}
+      let resultado = ''
+      if (imagenes?.length > 0) {
+        const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+        resultado = await enviarImagenProductoOpenAI(fileBuffer)
+      }
       if (resultado && resultado !== '' && resultado !== 'No es un producto') {
-        await state.update({
-          productoDetectadoEnImagen: true,
-          productoReconocidoPorIA: resultado
-        })
+        await state.update({ productoDetectadoEnImagen: true, productoReconocidoPorIA: resultado })
         console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
       }
     }
+
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
 
@@ -110,13 +101,10 @@ if (imagenes?.length > 0) {
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
-      // 👇 NUEVO: limpiar flags después de la interacción
-      await state.update({
-        productoDetectadoEnImagen: false,
-        productoReconocidoPorIA: ''
-      })
+      await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
     })
   })
+
   .addAction({ capture: true }, async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
@@ -124,11 +112,7 @@ if (imagenes?.length > 0) {
     const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone) || {}
     const datos = {}
 
-    // 👇 NUEVO: limpieza previa
-    await state.update({
-      productoDetectadoEnImagen: false,
-      productoReconocidoPorIA: ''
-    })
+    await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
 
     if (/me llamo|mi nombre es/i.test(message)) {
       const nombre = message.split(/me llamo|mi nombre es/i)[1]?.trim()
@@ -147,19 +131,15 @@ if (imagenes?.length > 0) {
 
     const detectar = await DetectarArchivos(ctx, state)
 
-    // 👇 NUEVO: si contiene imagen
     if (state.get('tipoMensaje') === 1) {
       const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
-let resultado = ''
-if (imagenes?.length > 0) {
-    const fileBuffer = fs.readFileSync(imagenes[0].ruta)
-    resultado = await enviarImagenProductoOpenAI(fileBuffer)
-}
+      let resultado = ''
+      if (imagenes?.length > 0) {
+        const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+        resultado = await enviarImagenProductoOpenAI(fileBuffer)
+      }
       if (resultado && resultado !== '' && resultado !== 'No es un producto') {
-        await state.update({
-          productoDetectadoEnImagen: true,
-          productoReconocidoPorIA: resultado
-        })
+        await state.update({ productoDetectadoEnImagen: true, productoReconocidoPorIA: resultado })
         console.log(`🖼️ [IAINFO] Producto detectado en imagen (continuación): ${resultado}`)
       }
     }
@@ -200,11 +180,7 @@ if (imagenes?.length > 0) {
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
-      // 👇 NUEVO: limpieza final
-      await state.update({
-        productoDetectadoEnImagen: false,
-        productoReconocidoPorIA: ''
-      })
+      await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
     })
 
     return tools.fallBack()
@@ -253,14 +229,12 @@ async function obtenerProductosCorrectos(texto, state) {
   const sugeridos = state.get('productosUltimaSugerencia') || []
   console.log('🧪 [flowIAinfo] Texto recibido para búsqueda:', texto)
 
-  // 👇 NUEVO: si se detectó producto por imagen, se busca directamente
   if (state.get('productoDetectadoEnImagen') && state.get('productoReconocidoPorIA')) {
     const productosFull = state.get('_productosFull') || []
     let productos = filtrarPorTextoLibre(productosFull, state.get('productoReconocidoPorIA'))
 
     console.log(`🔍 [IAINFO] Buscando producto por imagen detectada: ${state.get('productoReconocidoPorIA')}`)
-    
-    // 👇 NUEVO: si no hay productos o ninguno es suficientemente exacto, intenta traducir
+
     if (!productos.length || !encontroProductoExacto(productos, state.get('productoReconocidoPorIA'))) {
       console.log('🔎 [IAINFO] No se encontró producto exacto, intentando traducción...')
       const traduccion = await traducirTexto(state.get('productoReconocidoPorIA'))
@@ -293,28 +267,6 @@ async function obtenerProductosCorrectos(texto, state) {
   return []
 }
 
-  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
-    console.log('🔍 [IAINFO] Aclaración sobre producto sugerido anteriormente.')
-    return filtrarPorTextoLibre(sugeridos, texto)
-  }
-
-  if (await esMensajeRelacionadoAProducto(texto, state)) {
-    console.log('🔍 [IAINFO] Producto detectado con contexto dinámico.')
-    const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, texto)
-  }
-
-  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '', state)
-  if (esConsultaProductos) {
-    console.log('🔍 [IAINFO] Intención de producto detectada vía OpenAI.')
-    const productosFull = state.get('_productosFull') || []
-    return filtrarPorTextoLibre(productosFull, texto)
-  }
-
-  console.log('🚫 [IAINFO] No se detectó relación con productos.')
-  return []
-}
-
 async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
   const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
   if (patronesFijos.test(texto)) return true
@@ -323,12 +275,13 @@ async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
   const textoLower = texto.toLowerCase()
   return ultimaConsulta && textoLower.length <= 12 && !textoLower.includes('hola') && textoLower.length >= 3
 }
+
 function encontroProductoExacto(productos, nombreBuscado) {
   const nombreLimpio = nombreBuscado.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/)
   return productos.some(p => {
     const productoLimpio = p.NOMBRE.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/)
     const coincidencias = nombreLimpio.filter(palabra => productoLimpio.includes(palabra)).length
     const porcentaje = coincidencias / nombreLimpio.length
-    return porcentaje >= 0.7 // puedes subir o bajar este valor si quieres ser más estricto o más flexible
+    return porcentaje >= 0.7
   })
 }
