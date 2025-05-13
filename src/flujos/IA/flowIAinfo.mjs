@@ -26,6 +26,13 @@ import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntenci
 import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
 
+// 👇 NUEVO helper para limpiar respuesta de Vision
+export function extraerNombreProductoDeVision(texto) {
+  const match = texto.match(/["“](.*?)["”]/)
+  if (match && match[1]) return match[1]
+  return texto
+}
+
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
@@ -52,17 +59,21 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const detectar = await DetectarArchivos(ctx, state)
 
     if (state.get('tipoMensaje') === 1) {
-      const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
-      let resultado = ''
-      if (imagenes?.length > 0) {
-        const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+    const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
+    let resultado = ''
+    if (imagenes?.length > 0) {
+        const fileBuffer = fs.readFileSync(imagenes[0].ruta)           // 👈 esta línea no se puede eliminar
         resultado = await enviarImagenProductoOpenAI(fileBuffer)
-      }
-      if (resultado && resultado !== '' && resultado !== 'No es un producto') {
-        await state.update({ productoDetectadoEnImagen: true, productoReconocidoPorIA: resultado })
-        console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
-      }
+        resultado = extraerNombreProductoDeVision(resultado)           // 👈 tu nueva línea
     }
+    if (resultado && resultado !== '' && resultado !== 'No es un producto') {
+        await state.update({
+            productoDetectadoEnImagen: true,
+            productoReconocidoPorIA: resultado
+        })
+        console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
+    }
+}
 
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
@@ -132,17 +143,21 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const detectar = await DetectarArchivos(ctx, state)
 
     if (state.get('tipoMensaje') === 1) {
-      const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
-      let resultado = ''
-      if (imagenes?.length > 0) {
-        const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+    const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
+    let resultado = ''
+    if (imagenes?.length > 0) {
+        const fileBuffer = fs.readFileSync(imagenes[0].ruta)           // 👈 esta línea no se puede eliminar
         resultado = await enviarImagenProductoOpenAI(fileBuffer)
-      }
-      if (resultado && resultado !== '' && resultado !== 'No es un producto') {
-        await state.update({ productoDetectadoEnImagen: true, productoReconocidoPorIA: resultado })
-        console.log(`🖼️ [IAINFO] Producto detectado en imagen (continuación): ${resultado}`)
-      }
+        resultado = extraerNombreProductoDeVision(resultado)           // 👈 tu nueva línea
     }
+    if (resultado && resultado !== '' && resultado !== 'No es un producto') {
+        await state.update({
+            productoDetectadoEnImagen: true,
+            productoReconocidoPorIA: resultado
+        })
+        console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
+    }
+}
 
     AgruparMensaje(detectar, async (txt) => {
       if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
