@@ -19,12 +19,12 @@ import { generarContextoProductosIA } from '../../funciones/helpers/generarConte
 import { flowProductos } from '../flowProductos.mjs'
 import { flowDetallesProducto } from '../flowDetallesProducto.mjs'
 import { ActualizarFechasContacto, ActualizarResumenUltimaConversacion } from '../../funciones/helpers/contactosSheetHelper.mjs'
-import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
 import { generarResumenConversacionIA } from '../../funciones/helpers/generarResumenConversacion.mjs'
 import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorProductos.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
 import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
+import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
 
 // 👇 NUEVO helper para limpiar respuesta de Vision
 export function extraerNombreProductoDeVision(texto) {
@@ -377,27 +377,3 @@ function encontroProductoExacto(productos, nombreBuscado) {
     return porcentaje >= 0.7
   })
 }
-
-async function detectarIntencionContactoIA(txt) {
-    const prompt = `
-Eres un asistente experto. Tu tarea es decir si el siguiente mensaje del usuario tiene la intención de entregarte datos personales como nombre, teléfono, email, dirección o cualquier dato de contacto. 
-
-Mensaje del usuario:
-"${txt}"
-
-Responde solamente este JSON:
-{
-  "esDatosContacto": true o false
-}
-`.trim()
-
-    try {
-        const respuesta = await EnviarTextoOpenAI(prompt, 'intencionContacto', 'INFO', {})
-        const parsed = JSON.parse(respuesta.respuesta || '{}')
-        return parsed.esDatosContacto || false
-    } catch (e) {
-        console.log('❌ [IAINFO] Error detectando intención de contacto por IA:', e)
-        return false
-    }
-}
-
