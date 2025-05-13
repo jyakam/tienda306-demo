@@ -24,7 +24,7 @@ import { esMensajeRelacionadoAProducto } from '../../funciones/helpers/detectorP
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
 import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
-import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
+import { verificarYActualizarContactoSiEsNecesario, detectarIntencionContactoIA } from '../../funciones/helpers/contactosIAHelper.mjs'   // ✅ NUEVO: helper IA Contactos
 
 // 👇 NUEVO helper para limpiar respuesta de Vision
 export function extraerNombreProductoDeVision(texto) {
@@ -99,16 +99,11 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
       console.log('📥 [IAINFO] Respuesta completa recibida de IA:', res?.respuesta)
 
-      const datosExtraidos = await extraerDatosContactoIA(txt, phone)
       const resumen = await generarResumenConversacionIA(txt, phone)
-      if (Object.keys(datosExtraidos).length > 0) {
-        await ActualizarContacto(phone, datosExtraidos)
-        console.log('📇 [IAINFO] Datos de contacto actualizados:', datosExtraidos)
-      }
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-        console.log('📝 [IAINFO] Resumen de conversación guardado.')
-      }
+if (resumen) {
+    await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+    console.log('📝 [IAINFO] Resumen de conversación guardado.')
+}
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
@@ -125,9 +120,10 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
 
+    // Detección rápida nombre / email (opcional)
     if (/me llamo|mi nombre es/i.test(message)) {
-      const nombre = message.split(/me llamo|mi nombre es/i)[1]?.trim()
-      if (nombre && !/\d/.test(nombre)) datos.nombre = nombre
+        const nombre = message.split(/me llamo|mi nombre es/i)[1]?.trim()
+        if (nombre && !/\d/.test(nombre)) datos.nombre = nombre
     }
 
     const email = message.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)
@@ -135,74 +131,74 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     if (contacto) await ActualizarFechasContacto(contacto, phone)
 
+    // Si no están cargados productos, cargarlos
     if (!state.get('_productosFull')?.length) {
-      await cargarProductosAlState(state)
-      await state.update({ __productosCargados: true })
+        await cargarProductosAlState(state)
+        await state.update({ __productosCargados: true })
     }
 
+    // Procesar archivos si los hay
     const detectar = await DetectarArchivos(ctx, state)
 
+    // Verificar imágenes
     if (state.get('tipoMensaje') === 1) {
-    const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
-    let resultado = ''
-    if (imagenes?.length > 0) {
-        const fileBuffer = fs.readFileSync(imagenes[0].ruta)           // 👈 esta línea no se puede eliminar
-        resultado = await enviarImagenProductoOpenAI(fileBuffer)
-        resultado = extraerNombreProductoDeVision(resultado)           // 👈 tu nueva línea
+        const imagenes = state.get('archivos')?.filter(item => item.tipo === 1)
+        let resultado = ''
+        if (imagenes?.length > 0) {
+            const fileBuffer = fs.readFileSync(imagenes[0].ruta)
+            resultado = await enviarImagenProductoOpenAI(fileBuffer)
+            resultado = extraerNombreProductoDeVision(resultado)
+        }
+        if (resultado && resultado !== '' && resultado !== 'No es un producto') {
+            await state.update({
+                productoDetectadoEnImagen: true,
+                productoReconocidoPorIA: resultado
+            })
+            console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
+        }
     }
-    if (resultado && resultado !== '' && resultado !== 'No es un producto') {
-        await state.update({
-            productoDetectadoEnImagen: true,
-            productoReconocidoPorIA: resultado
-        })
-        console.log(`🖼️ [IAINFO] Producto detectado en imagen: ${resultado}`)
-    }
-}
 
+    // ✅ Aquí empieza la lógica de mensajes normales
     AgruparMensaje(detectar, async (txt) => {
-    if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
-    reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
-    Escribiendo(ctx)
+        if (ComprobrarListaNegra(ctx) || !BOT.ESTADO) return gotoFlow(idleFlow)
+        reset(ctx, gotoFlow, BOT.IDLE_TIME * 60)
+        Escribiendo(ctx)
 
-    console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', txt)
+        console.log('✏️ [IAINFO] Mensaje capturado en continuación de conversación:', txt)
 
-    const productos = await obtenerProductosCorrectos(txt, state)
-    const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
+        const productos = await obtenerProductosCorrectos(txt, state)
+        const promptExtra = productos.length ? generarContextoProductosIA(productos, state) : ''
 
-    if (productos.length) {
-        await state.update({ productosUltimaSugerencia: productos })
-    }
+        if (productos.length) {
+            await state.update({ productosUltimaSugerencia: productos })
+        }
 
-    const estado = {
-        esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
-        contacto: { ...contacto, ...datos }
-    }
+        const estado = {
+            esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
+            contacto: { ...contacto, ...datos }
+        }
 
-    const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
-        ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
-    }, estado)
+        const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
+            ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
+        }, estado)
 
-    const esDatosContacto = await detectarIntencionContactoIA(txt)
+        // ✅ NUEVO flujo de contacto seguro con helper
+        const esDatosContacto = await detectarIntencionContactoIA(txt)
+        if (esDatosContacto) {
+            await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
+        }
 
-if (esDatosContacto) {
-    const datosExtraidos = await extraerDatosContactoIA(txt, phone)
-    const datosCombinados = { ...datos, ...datosExtraidos }
-    if (Object.keys(datosCombinados).length > 0) {
-        await ActualizarContacto(phone, datosCombinados)
-    }
-}
+        const resumen = await generarResumenConversacionIA(txt, phone)
+        if (resumen) {
+            await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+        }
 
-    const resumen = await generarResumenConversacionIA(txt, phone)
-    if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-    }
+        await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
-    await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+        await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
+    })
 
-    await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
-})
-
-return tools.fallBack()
+    return tools.fallBack()
 })
 
 async function manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt) {
