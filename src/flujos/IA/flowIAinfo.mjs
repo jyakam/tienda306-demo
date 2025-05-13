@@ -377,3 +377,11 @@ function encontroProductoExacto(productos, nombreBuscado) {
     return porcentaje >= 0.7
   })
 }
+async function detectarSiEsMensajeDeContacto(txt) {
+    const patrones = [
+        'nombre', 'teléfono', 'telefono', 'dirección', 'direccion',
+        'email', 'correo', 'ciudad', 'país', 'pais',
+        'identificación', 'identificacion', 'cumpleaños', 'cumpleanos'
+    ]
+    return patrones.some(palabra => txt.toLowerCase().includes(palabra))
+}
