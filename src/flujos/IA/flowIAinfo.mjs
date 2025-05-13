@@ -267,13 +267,39 @@ async function obtenerProductosCorrectos(texto, state) {
   return []
 }
 
-async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
-  const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
-  if (patronesFijos.test(texto)) return true
+import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'
 
-  const ultimaConsulta = (state.get('ultimaConsulta') || '').toLowerCase()
-  const textoLower = texto.toLowerCase()
-  return ultimaConsulta && textoLower.length <= 12 && !textoLower.includes('hola') && textoLower.length >= 3
+async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
+  const ultimaSugerencia = state.get('productosUltimaSugerencia') || []
+
+  if (!ultimaSugerencia.length) return false
+
+  const nombresProductos = ultimaSugerencia.map(p => p.NOMBRE).slice(0, 3).join('\n')
+
+  const prompt = `
+Eres un asistente conversacional de ventas para una tienda online. 
+Tu tarea es únicamente responder si la siguiente consulta del cliente es una continuación o aclaración relacionada a los siguientes productos que se le ofrecieron anteriormente.
+
+Productos sugeridos anteriormente:
+${nombresProductos}
+
+Mensaje actual del cliente:
+"${texto}"
+
+Responde solamente este JSON:
+{
+  "esAclaracion": true o false
+}
+  `.trim()
+
+  try {
+    const respuesta = await EnviarTextoOpenAI(prompt, 'aclaracion', 'INFO', {})
+    const parsed = JSON.parse(respuesta.respuesta || '{}')
+    return parsed.esAclaracion || false
+  } catch (e) {
+    console.log('❌ [IAINFO] Error detectando aclaración:', e)
+    return false
+  }
 }
 
 function encontroProductoExacto(productos, nombreBuscado) {
