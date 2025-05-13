@@ -116,26 +116,30 @@ ETIQUETA: contactoExistente.ETIQUETA || 'Cliente'
 
 // Solo actualizar si el valor es nuevo o diferente al existente (incluye control para undefined/null)
 for (const campo in datos) {
-let valor = datos\[campo]
-if (typeof valor === 'string') valor = valor.trim()
-if (
-(typeof valor === 'string' && valor !== '' && valor !== (contactoExistente\[campo] ?? '')) ||
-(typeof valor === 'number' && valor !== (contactoExistente\[campo] ?? undefined)) ||
-(typeof valor === 'boolean' && valor !== (contactoExistente\[campo] ?? undefined))
-) {
-if (campo === 'nombre') {
-const nombreValido = typeof valor === 'string' && valor !== 'Sin Nombre' && !/^\[^\w\s]+\$/.test(valor)
-if (nombreValido) contactoFinal.NOMBRE = valor
-} else {
-const campoNormalizado = campo.toUpperCase() === 'TIPO\_CLIENTE' ? 'TIPO DE CLIENTE' : campo.toUpperCase()
-if (COLUMNAS\_VALIDAS.includes(campoNormalizado)) {
-contactoFinal\[campoNormalizado] = valor
-} else {
-console.warn(`⚠️ Campo ${campoNormalizado} no está en la tabla PAG_CONTACTOS, ignorado`)
+  let valor = datos[campo]
+  if (typeof valor === 'string') valor = valor.trim()
+
+  if (
+    (typeof valor === 'string' && valor !== '' && valor !== (contactoExistente[campo] ?? '')) ||
+    (typeof valor === 'number' && valor !== (contactoExistente[campo] ?? undefined)) ||
+    (typeof valor === 'boolean' && valor !== (contactoExistente[campo] ?? undefined))
+  ) {
+    if (campo === 'nombre') {
+      const nombreValido = typeof valor === 'string' && valor !== 'Sin Nombre' && !/^[^\w\s]+$/.test(valor)
+      if (nombreValido) contactoFinal.NOMBRE = valor
+    } else {
+      const campoNormalizado = campo.toUpperCase() === 'TIPO_CLIENTE' ? 'TIPO DE CLIENTE' : campo.toUpperCase()
+      if (COLUMNAS_VALIDAS.includes(campoNormalizado)) {
+        contactoFinal[campoNormalizado] = valor
+      } else {
+        console.warn(`⚠️ Campo ${campoNormalizado} no está en la tabla PAG_CONTACTOS, ignorado`)
+      }
+    }
+  } else {
+    console.log(`ℹ️ No se actualizó '${campo}' para ${phone}, valor sin cambios.`)
+  }
 }
-}
-}
-}
+
 
 const camposTotales = \[
 'NOMBRE', 'EMAIL', 'CIUDAD', 'PAIS', 'DIRECCION',
