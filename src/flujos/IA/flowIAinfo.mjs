@@ -377,7 +377,6 @@ function encontroProductoExacto(productos, nombreBuscado) {
     return porcentaje >= 0.7
   })
 }
-import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'   // 👈 ya la tienes seguro, si no agrégala arriba
 
 async function detectarIntencionContactoIA(txt) {
     const prompt = `
