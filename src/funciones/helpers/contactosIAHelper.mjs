@@ -152,3 +152,18 @@ export async function verificarYActualizarContactoSiEsNecesario(txt, phone, cont
     await ActualizarContacto(phone, datosFiltrados)
     console.log(`✅ [IAINFO] Datos de contacto actualizados para ${phone}`)
 }
+
+/**
+ * Limpia un objeto contacto para mostrarlo sin campos vacíos (SOLO PARA VISUALIZAR).
+ * Úsalo donde vayas a mostrar los datos al usuario/admin, NO al guardar.
+ */
+export function limpiarContactoParaMostrar(contacto = {}) {
+    return Object.fromEntries(
+        Object.entries(contacto).filter(
+            ([_, valor]) =>
+                valor !== undefined &&
+                valor !== null &&
+                (typeof valor === 'string' ? valor.trim() !== '' : true)
+        )
+    )
+}
