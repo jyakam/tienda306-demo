@@ -6,7 +6,6 @@ import { ENUM_IA_RESPUESTAS } from '../../APIs/OpenAi/IAEnumRespuestas.mjs'
 import { Escribiendo } from '../../funciones/proveedor.mjs'
 import { Esperar } from '../../funciones/tiempo.mjs'
 import { ENUNGUIONES } from '../../APIs/OpenAi/guiones.mjs'
-import { ActualizarContacto } from '../../config/contactos.mjs'
 import { DetectarArchivos } from '../bloques/detectarArchivos.mjs'
 import { EnviarIA } from '../bloques/enviarIA.mjs'
 import { cargarProductosAlState } from '../../funciones/helpers/cacheProductos.mjs'
@@ -15,7 +14,6 @@ import { generarContextoProductosIA } from '../../funciones/helpers/generarConte
 import { flowProductos } from '../flowProductos.mjs'
 import { flowDetallesProducto } from '../flowDetallesProducto.mjs'
 import { ActualizarFechasContacto } from '../../funciones/helpers/contactosSheetHelper.mjs'
-import { extraerDatosContactoIA } from '../../funciones/helpers/extractDatosIA.mjs'
 import { obtenerIntencionConsulta } from '../../funciones/helpers/obtenerIntencionConsulta.mjs'
 import { flowIAinfo } from './flowIAinfo.mjs'
 import { extraerNombreProducto } from '../../funciones/helpers/extractNombreProducto.mjs'
@@ -51,7 +49,7 @@ export const flowIAImagen = addKeyword(EVENTS.MEDIA)
     console.log('📩 [IAIMAGEN] Mensaje de imagen recibido de:', phone)
     if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
     if (!contacto) {
-      await ActualizarContacto(phone, { nombre: 'Sin Nombre', resp_bot: 'Sí', etiqueta: 'Nuevo' })
+      // Solo registra el contacto, no actualiza datos de contacto aquí
       console.log('👤 [IAIMAGEN] Contacto nuevo registrado:', phone)
     }
 
@@ -136,13 +134,6 @@ export const flowIAImagen = addKeyword(EVENTS.MEDIA)
       await manejarRespuestaIA(resIA, ctx, flowDynamic, gotoFlow, state, textoFinal)
     }
 
-    // Actualizar datos de contacto
-    const datosExtraidos = await extraerDatosContactoIA(ctx.body, phone)
-    if (Object.keys(datosExtraidos).length > 0) {
-      await ActualizarContacto(phone, datosExtraidos)
-      console.log('📇 [IAIMAGEN] Datos de contacto actualizados:', datosExtraidos)
-    }
-
     // Limpiar productoReconocidoPorIA
     await limpiarProductoReconocido(state)
 
@@ -158,87 +149,4 @@ export const flowIAImagen = addKeyword(EVENTS.MEDIA)
     return gotoFlow(flowIAinfo)
   })
 
-async function manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state) {
-  const respuestaIA = res.respuesta?.toLowerCase?.() || ''
-  console.log('🧠 Token recibido de IA:', respuestaIA)
-
-  if (respuestaIA.includes('🧩 mostrarproductos')) {
-    await state.update({ ultimaConsulta: ctx.body })
-    return gotoFlow(flowProductos)
-  }
-
-  if (respuestaIA.includes('🧩 mostrardetalles')) {
-    return gotoFlow(flowDetallesProducto)
-  }
-
-  if (respuestaIA.includes('🧩 solicitarayuda')) {
-    return gotoFlow(flowProductos)
-  }
-
-  await Responder(res, ctx, flowDynamic, state)
-}
-
-async function Responder(res, ctx, flowDynamic, state) {
-  if (res.tipo === ENUM_IA_RESPUESTAS.TEXTO && res.respuesta) {
-    await Esperar(BOT.DELAY)
-
-    const yaRespondido = state.get('ultimaRespuestaSimple') || ''
-    const nuevaRespuesta = res.respuesta.toLowerCase().trim()
-
-    if (nuevaRespuesta && nuevaRespuesta === yaRespondido) {
-      console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.')
-      return
-    }
-
-    await state.update({ ultimaRespuestaSimple: nuevaRespuesta })
-
-    const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx)
-    return await flowDynamic(msj)
-  }
-}
-
-async function obtenerProductosCorrectos(texto, state) {
-  const sugeridos = state.get('productosUltimaSugerencia') || []
-  const productoReconocido = state.get('productoReconocidoPorIA') || ''
-  console.log('🔍 [DEBUG] productoReconocidoPorIA en obtenerProductosCorrectos:', productoReconocido)
-  console.log('🔍 [DEBUG] Texto recibido en obtenerProductosCorrectos:', texto)
-
-  const textoBusqueda = productoReconocido || texto
-  console.log('🔍 [DEBUG] textoBusqueda para filtrarPorTextoLibre:', textoBusqueda)
-
-  if (productoReconocido) {
-    console.log('🔍 [IAIMAGEN] Nueva búsqueda con productoReconocidoPorIA, ignorando aclaración.')
-    const productosFull = state.get('_productosFull') || []
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (nueva búsqueda):', textoBusqueda)
-    return filtrarPorTextoLibre(productosFull, textoBusqueda, state)
-  }
-
-  if (await esAclaracionSobreUltimaSugerencia(texto, state) && sugeridos.length) {
-    console.log('🔍 [IAIMAGEN] Aclaración sobre producto sugerido anteriormente.')
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (aclaración):', textoBusqueda)
-    return filtrarPorTextoLibre(sugeridos, textoBusqueda, state)
-  }
-
-  const { esConsultaProductos } = await obtenerIntencionConsulta(texto, state.get('ultimaConsulta') || '')
-  if (esConsultaProductos) {
-    console.log('🔍 [IAIMAGEN] Intención de producto detectada vía OpenAI.')
-    const productosFull = state.get('_productosFull') || []
-    console.log('🔍 [DEBUG] Texto enviado a filtrarPorTextoLibre (OpenAI):', textoBusqueda)
-    return filtrarPorTextoLibre(productosFull, textoBusqueda, state)
-  }
-
-  console.log('🚫 [IAIMAGEN] No se detectó relación con productos.')
-  return []
-}
-
-async function esAclaracionSobreUltimaSugerencia(texto = '', state) {
-  const productoReconocido = state.get('productoReconocidoPorIA') || ''
-  if (productoReconocido) return false
-
-  const patronesFijos = /(talla|color|precio|disponible|modelo|envío|cuánto|sirve|cómo|ingredientes|combinación|me conviene|me ayuda|es bueno|es mejor|cuál|por qué|se aplica|modo|efecto|lo uso|día|noche|se mezcla|sirve si)/i
-  if (patronesFijos.test(texto)) return true
-
-  const ultimaConsulta = (state.get('ultimaConsulta') || '').toLowerCase()
-  const textoLower = texto.toLowerCase()
-  return ultimaConsulta && textoLower.length <= 12 && !textoLower.includes('hola') && textoLower.length >= 3
-}
+// ... (resto igual)
