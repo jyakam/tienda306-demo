@@ -95,7 +95,7 @@ export function SincronizarContactos() {
   }
 }
 
-// ----> FUNCION PRINCIPAL AJUSTADA <----
+// ----> FUNCION PRINCIPAL AJUSTADA + LOGS DETALLADOS <----
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
@@ -160,6 +160,9 @@ export async function ActualizarContacto(phone, datos = {}) {
     }
   }
 
+  // LOG ANTES DE FILTRAR
+  console.log('⏳ LOG antes de filtrar contactoLimpio:', JSON.stringify(contactoFinal, null, 2))
+
   // Solo enviar campos válidos y CON VALOR
   const contactoLimpio = Object.fromEntries(
     Object.entries(contactoFinal).filter(([key, v]) =>
@@ -171,6 +174,9 @@ export async function ActualizarContacto(phone, datos = {}) {
       )
     )
   )
+
+  // LOG DESPUÉS DE FILTRAR
+  console.log('🧹 LIMPIO PARA ENVIAR:', JSON.stringify(contactoLimpio, null, 2))
 
   // Validar campos obligatorios
   const camposObligatorios = ['TELEFONO']
