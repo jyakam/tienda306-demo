@@ -17,10 +17,10 @@ const COLUMNAS_VALIDAS = [
   'IDENTIFICACION',
   'EMAIL',
   'DIRECCION',
-  'DIRECCION_2',         // <-- agregado
+  'DIRECCION_2',
   'CIUDAD',
   'PAIS',
-  'ESTADO_DEPARTAMENTO', // <-- agregado
+  'ESTADO_DEPARTAMENTO',
   'ETIQUETA',
   'TIPO DE CLIENTE',
   'RESUMEN_ULTIMA_CONVERSACION'
@@ -95,6 +95,7 @@ export function SincronizarContactos() {
   }
 }
 
+// ----> FUNCION PRINCIPAL AJUSTADA <----
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
@@ -114,7 +115,7 @@ export async function ActualizarContacto(phone, datos = {}) {
     ETIQUETA: contactoExistente.ETIQUETA || 'Cliente'
   }
 
-  // Solo actualizar si el valor es nuevo o diferente al existente (incluye control para undefined/null)
+  // Solo agregar/actualizar si el valor es nuevo y no vacío
   for (const campo in datos) {
     let valor = datos[campo]
     if (typeof valor === 'string') valor = valor.trim()
@@ -140,35 +141,26 @@ export async function ActualizarContacto(phone, datos = {}) {
     }
   }
 
-  const camposTotales = [
-    'NOMBRE', 'EMAIL', 'CIUDAD', 'PAIS', 'DIRECCION', 'DIRECCION_2', 'ESTADO_DEPARTAMENTO',
-    'IDENTIFICACION', 'TIPO DE CLIENTE', 'RESUMEN_ULTIMA_CONVERSACION'
-  ]
-  for (const campo of camposTotales) {
-    if (!(campo in contactoFinal)) {
-      const valAnterior = contactoExistente[campo]
-      if (
-        (typeof valAnterior === 'string' && valAnterior.trim() !== '') ||
-        typeof valAnterior === 'number' ||
-        typeof valAnterior === 'boolean'
-      ) {
-        contactoFinal[campo] = valAnterior
-      }
+  // Ahora sí: SOLO preserva los campos anteriores SI tienen valor (y no fueron ya actualizados)
+  for (const campo of COLUMNAS_VALIDAS) {
+    if (
+      !(campo in contactoFinal) &&
+      contactoExistente[campo] !== undefined &&
+      contactoExistente[campo] !== null &&
+      typeof contactoExistente[campo] === 'string' &&
+      contactoExistente[campo].trim() !== ''
+    ) {
+      contactoFinal[campo] = contactoExistente[campo]
+    }
+    if (
+      !(campo in contactoFinal) &&
+      (typeof contactoExistente[campo] === 'number' || typeof contactoExistente[campo] === 'boolean')
+    ) {
+      contactoFinal[campo] = contactoExistente[campo]
     }
   }
 
-  const sensibles = ['NOMBRE', 'EMAIL', 'CIUDAD', 'DIRECCION']
-  for (const campo of sensibles) {
-    const antes = contactoExistente[campo] ?? ''
-    const nuevo = contactoFinal[campo] ?? ''
-    const loCambioIA = campo.toLowerCase() in datos
-    if (antes !== nuevo && !loCambioIA) {
-      console.warn(`⚠️ CAMBIO MANUAL POSIBLE en '${campo}' para ${phone}:`)
-      console.warn(`   ➤ Anterior: ${antes}`)
-      console.warn(`   ➤ Nuevo:    ${nuevo}`)
-    }
-  }
-
+  // Solo enviar campos válidos y CON VALOR
   const contactoLimpio = Object.fromEntries(
     Object.entries(contactoFinal).filter(([key, v]) =>
       COLUMNAS_VALIDAS.includes(key) &&
@@ -180,6 +172,7 @@ export async function ActualizarContacto(phone, datos = {}) {
     )
   )
 
+  // Validar campos obligatorios
   const camposObligatorios = ['TELEFONO']
   for (const campo of camposObligatorios) {
     if (!(campo in contactoLimpio) || contactoLimpio[campo] === undefined || contactoLimpio[campo] === '') {
