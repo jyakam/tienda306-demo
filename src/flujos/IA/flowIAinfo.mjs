@@ -182,12 +182,14 @@ if (resumen) {
             ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
         }, estado)
 
-        // ✅ NUEVO flujo de contacto seguro con helper
-        const esDatosContacto = await detectarIntencionContactoIA(txt)
-        if (esDatosContacto) {
-            await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
-        }
-
+        // ✅ Solo revisa datos de contacto si NO es mensaje de producto
+const { esConsultaProductos } = await obtenerIntencionConsulta(txt, state.get('ultimaConsulta') || '', state)
+if (!esConsultaProductos) {
+    const esDatosContacto = await detectarIntencionContactoIA(txt)
+    if (esDatosContacto) {
+        await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
+    }
+}
         const resumen = await generarResumenConversacionIA(txt, phone)
         if (resumen) {
             await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
