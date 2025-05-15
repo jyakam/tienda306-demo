@@ -75,13 +75,19 @@ export async function verificarYActualizarContactoSiEsNecesario(txt, phone, cont
     console.log(`📇 [IAINFO] Intentando extraer datos IA para ${phone}...`)
 
     const datosExtraidos = await extraerDatosContactoIA(txt)
-    const datosCombinados = { ...datos, ...datosExtraidos }
+    // 🔥 SOLO guarda campos con valor real (no vacíos)
+    const datosFiltrados = Object.fromEntries(
+        Object.entries({ ...datos, ...datosExtraidos }).filter(
+            ([, valor]) => valor !== undefined && valor !== null && (typeof valor === 'string' ? valor.trim() !== '' : true)
+        )
+    );
 
     // Si no se encontró nada, no actualizamos
-    if (!Object.keys(datosCombinados).length) return
+    if (!Object.keys(datosFiltrados).length) return
 
-    console.log(`📇 [IAINFO] Datos combinados IA detectados para ${phone}:`, datosCombinados)
+    console.log(`📇 [IAINFO] Datos combinados IA detectados para ${phone}:`, datosFiltrados)
 
-    await ActualizarContacto(phone, datosCombinados)
+    await ActualizarContacto(phone, datosFiltrados)
     console.log(`✅ [IAINFO] Datos de contacto actualizados para ${phone}`)
 }
+
