@@ -77,13 +77,3 @@ export async function verificarYActualizarContactoSiEsNecesario(txt, phone, cont
     await ActualizarContacto(phone, datosCombinados)
     console.log(`✅ [IAINFO] Datos de contacto actualizados para ${phone}`)
 }
-
-/** 
- * Export garantizado para Railway y Node.js
- * Esto no afecta ninguna funcionalidad existente. 
- */
-export {
-    detectarIntencionContactoIA,
-    extraerDatosContactoIA,
-    verificarYActualizarContactoSiEsNecesario
-}
