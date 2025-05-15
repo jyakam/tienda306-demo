@@ -17,8 +17,10 @@ const COLUMNAS_VALIDAS = [
   'IDENTIFICACION',
   'EMAIL',
   'DIRECCION',
+  'DIRECCION_2',         // <-- agregado
   'CIUDAD',
   'PAIS',
+  'ESTADO_DEPARTAMENTO', // <-- agregado
   'ETIQUETA',
   'TIPO DE CLIENTE',
   'RESUMEN_ULTIMA_CONVERSACION'
@@ -50,6 +52,7 @@ async function postTableWithRetry(config, table, data, props, retries = 3, delay
     }
   }
 }
+
 export function SincronizarContactos() {
   const contactos = ObtenerContactos()
   if (contactos && contactos !== 'DESCONECTADO') {
@@ -91,6 +94,7 @@ export function SincronizarContactos() {
     }
   }
 }
+
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
@@ -137,7 +141,7 @@ export async function ActualizarContacto(phone, datos = {}) {
   }
 
   const camposTotales = [
-    'NOMBRE', 'EMAIL', 'CIUDAD', 'PAIS', 'DIRECCION',
+    'NOMBRE', 'EMAIL', 'CIUDAD', 'PAIS', 'DIRECCION', 'DIRECCION_2', 'ESTADO_DEPARTAMENTO',
     'IDENTIFICACION', 'TIPO DE CLIENTE', 'RESUMEN_ULTIMA_CONVERSACION'
   ]
   for (const campo of camposTotales) {
@@ -227,4 +231,3 @@ export async function ActualizarContacto(phone, datos = {}) {
     console.error(`❌ Error actualizando contacto ${phone}:`, error.message)
   }
 }
-
