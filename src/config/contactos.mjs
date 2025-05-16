@@ -95,7 +95,7 @@ export function SincronizarContactos() {
   }
 }
 
-// ----> FUNCION PRINCIPAL AJUSTADA + LOGS DETALLADOS <----
+// ----> FUNCION PRINCIPAL AJUSTADA <----
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
@@ -141,7 +141,7 @@ export async function ActualizarContacto(phone, datos = {}) {
     }
   }
 
-  // Ahora sí: SOLO preserva los campos anteriores SI tienen valor (y no fueron ya actualizados)
+  // SOLO preserva los campos anteriores SI tienen valor (y no fueron ya actualizados)
   for (const campo of COLUMNAS_VALIDAS) {
     if (
       !(campo in contactoFinal) &&
