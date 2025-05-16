@@ -36,6 +36,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
+    // ⚠️ Aquí se debe traer SIEMPRE el contacto actualizado del cache
     const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone)
 
     console.log('📩 [IAINFO] Mensaje recibido de:', phone)
@@ -76,7 +77,6 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     AgruparMensaje(detectar, async (txt) => {
       Escribiendo(ctx)
-
       console.log('🧾 [IAINFO] Texto agrupado final del usuario:', txt)
 
       const productos = await obtenerProductosCorrectos(txt, state)
@@ -114,6 +114,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
     const message = ctx.body.trim()
+    // ⚠️ Siempre se debe traer el contacto del cache actualizado (en CONTACTOS.LISTA_CONTACTOS)
     const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone) || {}
     const datos = {}
 
@@ -181,6 +182,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       if (!esConsultaProductos) {
         const esDatosContacto = await detectarIntencionContactoIA(txt)
         if (esDatosContacto) {
+          // ⚠️ Nuevo LOG: muestra contacto del cache antes de actualizar (esto te ayuda a debuggear)
           console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en RAM/state:", contacto)
           await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
         }
