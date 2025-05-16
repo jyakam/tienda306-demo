@@ -1,10 +1,13 @@
 // src/funciones/helpers/cacheContactos.mjs
-import { getTable, postTable } from 'appsheet-connect'
+import { getTable } from 'appsheet-connect'
 import { APPSHEETCONFIG } from '../../config/bot.mjs'
 
 const CACHE = { LISTA_CONTACTOS: [] }
 
-// Carga TODOS los contactos de AppSheet al arrancar el bot
+/**
+ * Carga TODOS los contactos desde AppSheet (solo úsalo si lo necesitas masivamente).
+ * No recomendado salvo para migración/administrador.
+ */
 export async function cargarContactosDesdeAppSheet() {
   try {
     const datos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS)
@@ -19,13 +22,29 @@ export async function cargarContactosDesdeAppSheet() {
   }
 }
 
-// Trae contacto por teléfono desde cache (agrega el +57 si lo necesitas)
-export function getContactoByTelefono(telefono) {
-  return CACHE.LISTA_CONTACTOS.find(c => c.TELEFONO === telefono) || null
+/**
+ * Busca un contacto por teléfono desde cache.
+ * Si no está, lo trae de AppSheet, lo agrega al cache y lo retorna.
+ * ¡Siempre usar esta función para obtener el contacto actualizado!
+ */
+export async function getContactoByTelefono(telefono) {
+  let contacto = CACHE.LISTA_CONTACTOS.find(c => c.TELEFONO === telefono)
+  if (!contacto) {
+    // Busca solo ese contacto desde AppSheet y actualiza el cache puntual
+    const nuevos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS, { filter: { TELEFONO: telefono } })
+    if (Array.isArray(nuevos) && nuevos.length > 0) {
+      contacto = nuevos[0]
+      actualizarContactoEnCache(contacto)
+    }
+  }
+  return contacto || null
 }
 
-// Actualiza un contacto puntual en el cache
+/**
+ * Actualiza un contacto puntual en el cache.
+ */
 export function actualizarContactoEnCache(contacto) {
+  if (!contacto || !contacto.TELEFONO) return
   const idx = CACHE.LISTA_CONTACTOS.findIndex(c => c.TELEFONO === contacto.TELEFONO)
   if (idx >= 0) {
     CACHE.LISTA_CONTACTOS[idx] = { ...CACHE.LISTA_CONTACTOS[idx], ...contacto }
@@ -34,17 +53,15 @@ export function actualizarContactoEnCache(contacto) {
   }
 }
 
-// Si no está en cache, lo trae directo de AppSheet, lo busca en la tabla y lo guarda en cache
+/**
+ * Trae (y cachea) un contacto puntual de AppSheet por si necesitas forzar la recarga
+ */
 export async function fetchContactoDesdeAppSheet(telefono) {
   try {
-    // Trae toda la tabla, filtra el contacto en memoria
-    const datos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS)
-    if (Array.isArray(datos)) {
-      const contacto = datos.find(c => c.TELEFONO === telefono)
-      if (contacto) {
-        actualizarContactoEnCache(contacto)
-        return contacto
-      }
+    const datos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS, { filter: { TELEFONO: telefono } })
+    if (Array.isArray(datos) && datos[0]) {
+      actualizarContactoEnCache(datos[0])
+      return datos[0]
     }
     return null
   } catch (e) {
@@ -53,6 +70,9 @@ export async function fetchContactoDesdeAppSheet(telefono) {
   }
 }
 
+/**
+ * Devuelve la lista actual de contactos en cache.
+ */
 export function getCacheContactos() {
   return CACHE.LISTA_CONTACTOS
 }
