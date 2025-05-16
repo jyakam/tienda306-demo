@@ -122,4 +122,11 @@ export async function verificarYActualizarContactoSiEsNecesario(txt, phone, cont
 
 export function limpiarContactoParaMostrar(contacto = {}) {
   return Object.fromEntries(
-    Object.entries(contacto).
+    Object.entries(contacto).filter(
+      ([_, valor]) =>
+        valor !== undefined &&
+        valor !== null &&
+        (typeof valor === 'string' ? valor.trim() !== '' : true)
+    )
+  )
+}
