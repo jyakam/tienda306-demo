@@ -27,10 +27,7 @@ import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProduc
 import { verificarYActualizarContactoSiEsNecesario, detectarIntencionContactoIA } from '../../funciones/helpers/contactosIAHelper.mjs'
 
 // IMPORTANTE: Cache de contactos (nuevo sistema)
-import {
-  getContactoByTelefono,
-  fetchContactoDesdeAppSheet
-} from '../../funciones/helpers/cacheContactos.mjs'
+import { getContactoByTelefono } from '../../funciones/helpers/cacheContactos.mjs'
 
 export function extraerNombreProductoDeVision(texto) {
   const match = texto.match(/["“](.*?)["”]/)
@@ -43,10 +40,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
 
-    // --> SIEMPRE TRAE CONTACTO DEL CACHE o desde AppSheet si no existe
-    let contacto = getContactoByTelefono(phone)
-    if (!contacto) {
-      contacto = await fetchContactoDesdeAppSheet(phone)
+    // Siempre trae contacto del caché (sin fetch puntual)
+let contacto = getContactoByTelefono(phone)
     }
 
     console.log('📩 [IAINFO] Mensaje recibido de:', phone)
@@ -129,11 +124,8 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const message = ctx.body.trim()
 
     // Siempre toma el contacto del cache actualizado
-    let contacto = getContactoByTelefono(phone)
-    if (!contacto) {
-      contacto = await fetchContactoDesdeAppSheet(phone)
-    }
-    const datos = {}
+let contacto = getContactoByTelefono(phone)
+const datos = {}
 
     await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
 
