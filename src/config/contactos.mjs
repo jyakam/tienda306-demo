@@ -2,7 +2,13 @@
 import 'dotenv/config'
 import { postTable } from 'appsheet-connect'
 import { ObtenerContactos } from '../funciones/proveedor.mjs'
-import { APPSHEETCONFIG, CONTACTOS, ActualizarContactos, ActualizarFechas } from './bot.mjs'
+import { APPSHEETCONFIG, ActualizarContactos, ActualizarFechas } from './bot.mjs'
+
+// NUEVO: Importa helpers del cache de contactos
+import {
+  getContactoByTelefono,
+  actualizarContactoEnCache
+} from '../funciones/helpers/cacheContactos.mjs'
 
 const propiedades = {
   UserSettings: { DETECTAR: false }
@@ -58,7 +64,7 @@ export function SincronizarContactos() {
   // ... igual a tu versión, sin cambios ...
 }
 
-// ----> FUNCION PRINCIPAL BLINDADA <----
+// ----> FUNCION PRINCIPAL BLINDADA + USANDO CACHE <----
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
@@ -70,8 +76,8 @@ export async function ActualizarContacto(phone, datos = {}) {
     return
   }
 
-  // IMPORTANTE: siempre buscar el contacto actualizado en la lista antes de mergear
-  let contactoExistente = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone)
+  // *** Usar SIEMPRE el contacto del cache actualizado ***
+  let contactoExistente = getContactoByTelefono(phone)
   if (!contactoExistente) {
     // Si no existe, crea el contacto básico (solo número y fechas)
     contactoExistente = {
@@ -87,7 +93,7 @@ export async function ActualizarContacto(phone, datos = {}) {
   console.log(`👁️‍🗨️ [CONTACTO ANTERIOR]:`, JSON.stringify(contactoExistente, null, 2))
   console.log(`🆕 [DATOS RECIBIDOS]:`, JSON.stringify(datos, null, 2))
 
-  // Merge: empieza con todos los campos previos del contacto, luego solo sobreescribe los nuevos NO vacíos
+  // Merge: todos los campos previos + los nuevos, NO borra lo anterior
   const contactoFinal = { ...contactoExistente }
 
   // Proteger la clave TELEFONO
@@ -95,7 +101,6 @@ export async function ActualizarContacto(phone, datos = {}) {
   contactoFinal.RESP_BOT = contactoExistente.RESP_BOT || 'Sí'
   contactoFinal.ETIQUETA = contactoExistente.ETIQUETA || 'Cliente'
 
-  // Solo actualiza campos que tengan valor nuevo, NO vacíos
   for (const campo in datos) {
     let valor = datos[campo]
     if (typeof valor === 'string') valor = valor.trim()
@@ -104,7 +109,7 @@ export async function ActualizarContacto(phone, datos = {}) {
       if (valor && valor !== contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO) {
         contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO = valor
       }
-      continue // skip cambiar TELEFONO
+      continue
     }
     // Solo actualiza si el valor NO es vacío
     if (
@@ -153,15 +158,16 @@ export async function ActualizarContacto(phone, datos = {}) {
   }
 
   await ActualizarFechas(phone)
-  const contactoConFechas = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone)
-  if (contactoConFechas) {
-    if (contactoConFechas.FECHA_PRIMER_CONTACTO) {
-      contactoLimpio.FECHA_PRIMER_CONTACTO = contactoConFechas.FECHA_PRIMER_CONTACTO
-    }
-    if (contactoConFechas.FECHA_ULTIMO_CONTACTO) {
-      contactoLimpio.FECHA_ULTIMO_CONTACTO = contactoConFechas.FECHA_ULTIMO_CONTACTO
-    }
-  }
+  // Puedes dejar esta validación extra si la necesitas para fechas
+  // const contactoConFechas = getContactoByTelefono(phone)
+  // if (contactoConFechas) {
+  //   if (contactoConFechas.FECHA_PRIMER_CONTACTO) {
+  //     contactoLimpio.FECHA_PRIMER_CONTACTO = contactoConFechas.FECHA_PRIMER_CONTACTO
+  //   }
+  //   if (contactoConFechas.FECHA_ULTIMO_CONTACTO) {
+  //     contactoLimpio.FECHA_ULTIMO_CONTACTO = contactoConFechas.FECHA_ULTIMO_CONTACTO
+  //   }
+  // }
 
   try {
     console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
@@ -184,7 +190,11 @@ export async function ActualizarContacto(phone, datos = {}) {
     } else {
       console.log(`📦 Respuesta de postTable:`, resp)
     }
-    console.log(`✅ Contacto ${phone} actualizado correctamente.`)
+
+    // *** ACTUALIZA el cache local SIEMPRE que hay update exitoso ***
+    actualizarContactoEnCache(contactoFinal)
+    console.log(`✅ Contacto ${phone} actualizado correctamente (cache actualizado).`)
+
   } catch (error) {
     console.error(`❌ Error actualizando contacto ${phone}:`, error.message)
   }
