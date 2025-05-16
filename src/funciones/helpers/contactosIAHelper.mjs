@@ -1,6 +1,7 @@
 // src/funciones/helpers/contactosIAHelper.mjs
 
 import { EnviarTextoOpenAI } from '../../APIs/OpenAi/enviarTextoOpenAI.mjs'
+// Importa solo ActualizarContacto (que ahora ya está blindado con cacheContactos)
 import { ActualizarContacto } from '../../config/contactos.mjs'
 
 export async function detectarIntencionContactoIA(txt) {
@@ -103,6 +104,7 @@ function normalizarCamposContacto(datos) {
   return resultado
 }
 
+// NUEVO: Siempre el contacto actualizado va a venir del caché, porque ActualizarContacto lo hace
 export async function verificarYActualizarContactoSiEsNecesario(txt, phone, contacto = {}, datos = {}) {
   console.log(`📇 [IAINFO] Intentando extraer datos IA para ${phone}...`)
 
@@ -116,6 +118,7 @@ export async function verificarYActualizarContactoSiEsNecesario(txt, phone, cont
 
   console.log(`📇 [IAINFO] Datos combinados IA detectados para ${phone}:`, datosFiltrados)
 
+  // IMPORTANTE: Solo llama ActualizarContacto (el cual ya blinda contra sobrescritura y cache)
   await ActualizarContacto(phone, datosFiltrados)
   console.log(`✅ [IAINFO] Datos de contacto actualizados para ${phone}`)
 }
