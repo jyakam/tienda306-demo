@@ -181,6 +181,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       if (!esConsultaProductos) {
         const esDatosContacto = await detectarIntencionContactoIA(txt)
         if (esDatosContacto) {
+          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en RAM/state:", contacto)
           await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
         }
       }
