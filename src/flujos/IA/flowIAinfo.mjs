@@ -37,12 +37,11 @@ export function extraerNombreProductoDeVision(texto) {
 
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
-    const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
-    const phone = ctx.from.split('@')[0]
+  const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
+  const phone = ctx.from.split('@')[0]
 
-    // Siempre trae contacto del caché (sin fetch puntual)
-let contacto = getContactoByTelefono(phone)
-    }
+  // Siempre trae contacto del caché (sin fetch puntual)
+  let contacto = getContactoByTelefono(phone)
 
     console.log('📩 [IAINFO] Mensaje recibido de:', phone)
     if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
