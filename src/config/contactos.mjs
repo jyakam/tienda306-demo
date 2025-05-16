@@ -1,10 +1,10 @@
 // src/config/contactos.mjs
 import 'dotenv/config'
 import { postTable } from 'appsheet-connect'
-import { ObtenerContactos } from '../funciones/proveedor.mjs'
+// import { ObtenerContactos } from '../funciones/proveedor.mjs'  // (¡Ya no es necesario si usas cache!)
 import { APPSHEETCONFIG, ActualizarContactos, ActualizarFechas } from './bot.mjs'
 
-// NUEVO: Importa helpers del cache de contactos
+// Importa helpers del cache de contactos
 import {
   getContactoByTelefono,
   actualizarContactoEnCache
@@ -76,8 +76,8 @@ export async function ActualizarContacto(phone, datos = {}) {
     return
   }
 
-  // *** Usar SIEMPRE el contacto del cache actualizado ***
-  let contactoExistente = getContactoByTelefono(phone)
+  // SIEMPRE busca el contacto más actualizado (puede venir de AppSheet si no está en RAM)
+  let contactoExistente = await getContactoByTelefono(phone)
   if (!contactoExistente) {
     // Si no existe, crea el contacto básico (solo número y fechas)
     contactoExistente = {
@@ -158,16 +158,8 @@ export async function ActualizarContacto(phone, datos = {}) {
   }
 
   await ActualizarFechas(phone)
-  // Puedes dejar esta validación extra si la necesitas para fechas
-  // const contactoConFechas = getContactoByTelefono(phone)
-  // if (contactoConFechas) {
-  //   if (contactoConFechas.FECHA_PRIMER_CONTACTO) {
-  //     contactoLimpio.FECHA_PRIMER_CONTACTO = contactoConFechas.FECHA_PRIMER_CONTACTO
-  //   }
-  //   if (contactoConFechas.FECHA_ULTIMO_CONTACTO) {
-  //     contactoLimpio.FECHA_ULTIMO_CONTACTO = contactoConFechas.FECHA_ULTIMO_CONTACTO
-  //   }
-  // }
+  // Si quieres: después de fechas, podrías recargar el contacto otra vez por seguridad
+  // contactoExistente = await getContactoByTelefono(phone)
 
   try {
     console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
