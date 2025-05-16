@@ -2,7 +2,7 @@ import 'dotenv/config'
 import fs from 'fs'
 import { addKeyword, EVENTS } from '@builderbot/bot'
 import { ActualizarContacto } from '../../config/contactos.mjs'
-import { CONTACTOS, BOT } from '../../config/bot.mjs'
+import { BOT } from '../../config/bot.mjs'
 import { ENUM_IA_RESPUESTAS } from '../../APIs/OpenAi/IAEnumRespuestas.mjs'
 import { AgruparMensaje } from '../../funciones/agruparMensajes.mjs'
 import { Escribiendo } from '../../funciones/proveedor.mjs'
@@ -26,6 +26,12 @@ import { traducirTexto } from '../../funciones/helpers/traducirTexto.mjs'
 import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProductoOpenAI.mjs'
 import { verificarYActualizarContactoSiEsNecesario, detectarIntencionContactoIA } from '../../funciones/helpers/contactosIAHelper.mjs'
 
+// IMPORTANTE: Cache de contactos (nuevo sistema)
+import {
+  getContactoByTelefono,
+  fetchContactoDesdeAppSheet
+} from '../../funciones/helpers/cacheContactos.mjs'
+
 export function extraerNombreProductoDeVision(texto) {
   const match = texto.match(/["“](.*?)["”]/)
   if (match && match[1]) return match[1]
@@ -36,8 +42,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
-    // ⚠️ Aquí se debe traer SIEMPRE el contacto actualizado del cache
-    const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone)
+
+    // --> SIEMPRE TRAE CONTACTO DEL CACHE o desde AppSheet si no existe
+    let contacto = getContactoByTelefono(phone)
+    if (!contacto) {
+      contacto = await fetchContactoDesdeAppSheet(phone)
+    }
 
     console.log('📩 [IAINFO] Mensaje recibido de:', phone)
     if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
@@ -87,9 +97,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         console.log(`📦 [IAINFO] ${productos.length} productos encontrados y asociados al mensaje.`)
       }
 
+      // Siempre toma el contacto actualizado del cache (puede ser nulo)
+      let contactoCache = getContactoByTelefono(phone) || contacto || {}
+
       const estado = {
-        esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
-        contacto: contacto || {}
+        esClienteNuevo: !contactoCache || contactoCache.NOMBRE === 'Sin Nombre',
+        contacto: contactoCache
       }
 
       const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
@@ -100,7 +113,7 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
       const resumen = await generarResumenConversacionIA(txt, phone)
       if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+        await ActualizarResumenUltimaConversacion(contactoCache, phone, resumen)
         console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
@@ -114,8 +127,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
     const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
     const phone = ctx.from.split('@')[0]
     const message = ctx.body.trim()
-    // ⚠️ Siempre se debe traer el contacto del cache actualizado (en CONTACTOS.LISTA_CONTACTOS)
-    const contacto = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone) || {}
+
+    // Siempre toma el contacto del cache actualizado
+    let contacto = getContactoByTelefono(phone)
+    if (!contacto) {
+      contacto = await fetchContactoDesdeAppSheet(phone)
+    }
     const datos = {}
 
     await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
@@ -168,9 +185,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
         await state.update({ productosUltimaSugerencia: productos })
       }
 
+      // Siempre toma contacto actualizado (cache o fetch)
+      let contactoCache = getContactoByTelefono(phone) || contacto || {}
+
       const estado = {
-        esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
-        contacto: { ...contacto, ...datos }
+        esClienteNuevo: !contactoCache || contactoCache.NOMBRE === 'Sin Nombre',
+        contacto: { ...contactoCache, ...datos }
       }
 
       const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
@@ -182,14 +202,14 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
       if (!esConsultaProductos) {
         const esDatosContacto = await detectarIntencionContactoIA(txt)
         if (esDatosContacto) {
-          // ⚠️ Nuevo LOG: muestra contacto del cache antes de actualizar (esto te ayuda a debuggear)
-          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en RAM/state:", contacto)
-          await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
+          // LOG: muestra contacto cache antes de actualizar
+          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en cache:", contactoCache)
+          await verificarYActualizarContactoSiEsNecesario(txt, phone, contactoCache, datos)
         }
       }
       const resumen = await generarResumenConversacionIA(txt, phone)
       if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+        await ActualizarResumenUltimaConversacion(contactoCache, phone, resumen)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
