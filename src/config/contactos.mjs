@@ -58,21 +58,34 @@ export function SincronizarContactos() {
   // ... igual a tu versión, sin cambios ...
 }
 
-// ----> FUNCION PRINCIPAL AJUSTADA PARA NO BORRAR DATOS Y NO CAMBIAR TELEFONO <----
+// ----> FUNCION PRINCIPAL BLINDADA <----
 export async function ActualizarContacto(phone, datos = {}) {
   if (typeof datos !== 'object') {
     console.log(`⛔ Datos inválidos para contacto ${phone}`)
     return
   }
-
   if (Object.keys(datos).length === 0) {
     console.log(`⛔ No hay datos nuevos para actualizar contacto ${phone}`)
     await ActualizarFechas(phone)
     return
   }
 
-  // Busca el contacto existente por el teléfono principal (con 57)
-  const contactoExistente = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone) || {}
+  // IMPORTANTE: siempre buscar el contacto actualizado en la lista antes de mergear
+  let contactoExistente = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === phone)
+  if (!contactoExistente) {
+    // Si no existe, crea el contacto básico (solo número y fechas)
+    contactoExistente = {
+      TELEFONO: phone,
+      FECHA_PRIMER_CONTACTO: new Date().toLocaleDateString('es-CO'),
+      FECHA_ULTIMO_CONTACTO: new Date().toLocaleDateString('es-CO'),
+      RESP_BOT: 'Sí',
+      ETIQUETA: 'Cliente'
+    }
+  }
+
+  // DEBUG LOGS previos
+  console.log(`👁️‍🗨️ [CONTACTO ANTERIOR]:`, JSON.stringify(contactoExistente, null, 2))
+  console.log(`🆕 [DATOS RECIBIDOS]:`, JSON.stringify(datos, null, 2))
 
   // Merge: empieza con todos los campos previos del contacto, luego solo sobreescribe los nuevos NO vacíos
   const contactoFinal = { ...contactoExistente }
@@ -127,6 +140,9 @@ export async function ActualizarContacto(phone, datos = {}) {
     )
   )
 
+  // LOG después del merge
+  console.log(`🧩 [CONTACTO A GUARDAR]:`, JSON.stringify(contactoLimpio, null, 2))
+
   // Validar campos obligatorios
   const camposObligatorios = ['TELEFONO']
   for (const campo of camposObligatorios) {
@@ -147,10 +163,8 @@ export async function ActualizarContacto(phone, datos = {}) {
     }
   }
 
-  console.log(`📲 [ACTUALIZAR CONTACTO] Para ${phone}:`, contactoLimpio)
-
   try {
-    console.log(`📤 Enviando a postTable:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
+    console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
     const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades)
     if (!resp) {
       console.error(`❌ postTable devolvió null/undefined para contacto ${phone}`)
