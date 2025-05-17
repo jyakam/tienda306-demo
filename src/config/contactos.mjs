@@ -161,33 +161,17 @@ export async function ActualizarContacto(phone, datos = {}) {
   // Si quieres: después de fechas, podrías recargar el contacto otra vez por seguridad
   // contactoExistente = await getContactoByTelefono(phone)
 
-  try {
-    console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
-    const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades)
-    if (!resp) {
-      console.error(`❌ postTable devolvió null/undefined para contacto ${phone}`)
-      throw new Error('Respuesta vacía de AppSheet')
-    }
-    if (typeof resp === 'string') {
-      try {
-        const parsed = JSON.parse(resp)
-        console.log(`📦 postTable JSON parseado:`, parsed)
-      } catch (err) {
-        console.error(`❌ postTable devolvió un string no-JSON:`, resp)
-        throw new Error(`Respuesta no-JSON de AppSheet: ${resp}`)
-      }
-    } else if (resp?.status && resp.status >= 400) {
-      console.error(`❌ AppSheet devolvió HTTP ${resp.status}:`, resp.statusText || resp)
-      throw new Error(`Error HTTP ${resp.status} de AppSheet`)
-    } else {
-      console.log(`📦 Respuesta de postTable:`, resp)
-    }
-
-    // *** ACTUALIZA el cache local SIEMPRE que hay update exitoso ***
-    actualizarContactoEnCache(contactoFinal)
-    console.log(`✅ Contacto ${phone} actualizado correctamente (cache actualizado).`)
-
-  } catch (error) {
-    console.error(`❌ Error actualizando contacto ${phone}:`, error.message)
+ try {
+  console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
+  const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades)
+  if (!resp) {
+    console.error(`❌ postTable devolvió null/undefined para contacto ${phone}`)
+    throw new Error('Respuesta vacía de AppSheet')
   }
+  console.log(`📦 Respuesta de postTable:`, resp)
+} catch (error) {
+  console.error(`❌ Error actualizando contacto ${phone}:`, error.message)
+}
+actualizarContactoEnCache(contactoFinal)
+console.log(`✅ Contacto ${phone} actualizado en caché.`)
 }
