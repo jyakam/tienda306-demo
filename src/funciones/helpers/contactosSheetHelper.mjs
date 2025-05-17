@@ -2,6 +2,8 @@
 import { postTable } from 'appsheet-connect'
 import { ObtenerFechaActual } from '../../funciones/tiempo.mjs'
 import { APPSHEETCONFIG } from '../../config/bot.mjs'
+// IMPORTANTE: importa la función para actualizar la cache
+import { actualizarContactoEnCache } from './cacheContactos.mjs'
 
 const PROPIEDADES = { UserSettings: { DETECTAR: false } }
 const HOJA_CONTACTOS = process.env.PAG_CONTACTOS
@@ -19,8 +21,18 @@ export async function ActualizarFechasContacto(contacto, phone) {
 
   console.log(`🕓 [FECHAS] Contacto ${phone} →`, datos)
 
-  await postTable(APPSHEETCONFIG, HOJA_CONTACTOS, [datos], PROPIEDADES)
-  console.log(`📆 Contacto ${phone} actualizado con fechas.`)
+  try {
+    await postTable(APPSHEETCONFIG, HOJA_CONTACTOS, [datos], PROPIEDADES)
+    console.log(`📆 Contacto ${phone} actualizado con fechas.`)
+    // Actualiza la cache local con los datos nuevos
+    actualizarContactoEnCache({ ...contacto, ...datos })
+  } catch (err) {
+    console.log(`❌ Error actualizando fechas para ${phone}:`, err.message)
+    // Opcional: también actualiza la cache local aunque falle el postTable,
+    // para mantener coherencia y resiliencia temporal
+    actualizarContactoEnCache({ ...contacto, ...datos })
+    console.log(`⚠️ Cache actualizada localmente para ${phone} pese a error en AppSheet`)
+  }
 }
 
 export async function ActualizarResumenUltimaConversacion(contacto, phone, resumen) {
@@ -46,7 +58,12 @@ export async function ActualizarResumenUltimaConversacion(contacto, phone, resum
   try {
     await postTable(APPSHEETCONFIG, HOJA_CONTACTOS, [datos], PROPIEDADES)
     console.log(`📝 Resumen actualizado para ${phone}`)
+    // Actualiza la cache local con el resumen nuevo
+    actualizarContactoEnCache({ ...contacto, ...datos })
   } catch (err) {
     console.log(`❌ Error guardando resumen para ${phone}:`, err.message)
+    // Opcional: también actualiza la cache local aunque falle el postTable
+    actualizarContactoEnCache({ ...contacto, ...datos })
+    console.log(`⚠️ Cache actualizada localmente para ${phone} pese a error en AppSheet`)
   }
 }
