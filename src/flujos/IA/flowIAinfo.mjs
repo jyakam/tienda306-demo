@@ -42,13 +42,22 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
   // Siempre trae contacto del caché (sin fetch puntual)
   let contacto = getContactoByTelefono(phone)
-
-    console.log('📩 [IAINFO] Mensaje recibido de:', phone)
-    if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
-    if (!contacto) {
-      await ActualizarContacto(phone, { nombre: 'Sin Nombre', resp_bot: 'Sí', etiqueta: 'Nuevo' })
-      console.log('👤 [IAINFO] Contacto nuevo registrado:', phone)
-    }
+console.log('📩 [IAINFO] Mensaje recibido de:', phone)
+if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
+if (!contacto) {
+  await ActualizarContacto(phone, { NOMBRE: 'Sin Nombre', RESP_BOT: 'Sí', ETIQUETA: 'Nuevo' })
+  let intentos = 0
+  while (!contacto && intentos < 3) {
+    await new Promise(res => setTimeout(res, 250)) // Espera 250ms
+    contacto = getContactoByTelefono(phone)
+    intentos++
+  }
+  if (!contacto) {
+    console.error(`❌ Contacto ${phone} no encontrado en caché tras creación`)
+    return endFlow()
+  }
+  console.log('👤 [IAINFO] Contacto nuevo registrado:', phone)
+}
 
     if (contacto) await ActualizarFechasContacto(contacto, phone)
 
