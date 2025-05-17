@@ -20,10 +20,12 @@ export async function cargarContactosDesdeAppSheet() {
   }
 }
 
-// Trae contacto por teléfono desde cache (sincrónico y NUNCA retorna Promise)
 export function getContactoByTelefono(telefono) {
+  if (!CACHE.LISTA_CONTACTOS.length) {
+    console.warn('⚠️ [CACHE_CONTACTOS] Cache vacía, recargando desde AppSheet')
+    cargarContactosDesdeAppSheet() // Llamada síncrona, no esperamos
+  }
   const contacto = CACHE.LISTA_CONTACTOS.find(c => c.TELEFONO === telefono) || null
-  // Debug para asegurarte de lo que devuelve
   console.log('[DEBUG][USO] Tipo de contacto recibido:', typeof contacto, contacto)
   return contacto
 }
