@@ -27,7 +27,7 @@ import { enviarImagenProductoOpenAI } from '../../APIs/OpenAi/enviarImagenProduc
 import { verificarYActualizarContactoSiEsNecesario, detectarIntencionContactoIA } from '../../funciones/helpers/contactosIAHelper.mjs'
 
 // IMPORTANTE: Cache de contactos (nuevo sistema)
-import { getContactoByTelefono } from '../../funciones/helpers/cacheContactos.mjs'
+import { getContactoByTelefono, getCacheContactos, actualizarContactoEnCache } from '../../funciones/helpers/cacheContactos.mjs'
 
 export function extraerNombreProductoDeVision(texto) {
   const match = texto.match(/["“](.*?)["”]/)
@@ -37,27 +37,46 @@ export function extraerNombreProductoDeVision(texto) {
 
 export const flowIAinfo = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx, tools) => {
-  const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
-  const phone = ctx.from.split('@')[0]
+    const { flowDynamic, endFlow, gotoFlow, provider, state } = tools
+    const phone = ctx.from.split('@')[0]
+    console.log('📩 [IAINFO] Mensaje recibido de:', phone)
+    console.log(`🔍 [IAINFO] Estado inicial de la caché: ${getCacheContactos().length} contactos`)
 
-  // Siempre trae contacto del caché (sin fetch puntual)
-  let contacto = getContactoByTelefono(phone)
-console.log('📩 [IAINFO] Mensaje recibido de:', phone)
-if (!BOT.RESPONDER_NUEVOS && !contacto) return endFlow()
-if (!contacto) {
-  await ActualizarContacto(phone, { NOMBRE: 'Sin Nombre', RESP_BOT: 'Sí', ETIQUETA: 'Nuevo' })
-  let intentos = 0
-  while (!contacto && intentos < 3) {
-    await new Promise(res => setTimeout(res, 250)) // Espera 250ms
-    contacto = getContactoByTelefono(phone)
-    intentos++
-  }
-  if (!contacto) {
-    console.error(`❌ Contacto ${phone} no encontrado en caché tras creación`)
-    return endFlow()
-  }
-  console.log('👤 [IAINFO] Contacto nuevo registrado:', phone)
-}
+    let contacto = getContactoByTelefono(phone)
+    if (!BOT.RESPONDER_NUEVOS && !contacto) {
+      console.log(`🚫 [IAINFO] No se responde a nuevos contactos: ${phone}`)
+      return endFlow()
+    }
+    if (!contacto) {
+      console.log(`🆕 [IAINFO] Creando contacto nuevo para: ${phone}`)
+      try {
+        await ActualizarContacto(phone, { NOMBRE: 'Sin Nombre', RESP_BOT: 'Sí', ETIQUETA: 'Nuevo' })
+        contacto = getContactoByTelefono(phone)
+        console.log(`🔍 [IAINFO] Contacto tras ActualizarContacto:`, contacto)
+        if (!contacto) {
+          console.warn(`⚠️ [IAINFO] Contacto ${phone} no encontrado, creando localmente`)
+          const contactoLocal = {
+            TELEFONO: phone,
+            NOMBRE: 'Sin Nombre',
+            RESP_BOT: 'Sí',
+            ETIQUETA: 'Nuevo',
+            FECHA_PRIMER_CONTACTO: new Date().toLocaleDateString('es-CO'),
+            FECHA_ULTIMO_CONTACTO: new Date().toLocaleDateString('es-CO')
+          }
+          actualizarContactoEnCache(contactoLocal)
+          contacto = getContactoByTelefono(phone)
+          console.log(`🔍 [IAINFO] Contacto tras creación local:`, contacto)
+        }
+        if (!contacto) {
+          console.error(`❌ [IAINFO] Contacto ${phone} no creado`)
+          return endFlow()
+        }
+        console.log('👤 [IAINFO] Contacto nuevo registrado:', phone)
+      } catch (error) {
+        console.error(`❌ [IAINFO] Error al crear contacto ${phone}:`, error.message, error.stack)
+        return endFlow()
+      }
+    }
 
     if (contacto) await ActualizarFechasContacto(contacto, phone)
 
@@ -100,12 +119,9 @@ if (!contacto) {
         console.log(`📦 [IAINFO] ${productos.length} productos encontrados y asociados al mensaje.`)
       }
 
-      // Siempre toma el contacto actualizado del cache (puede ser nulo)
-      let contactoCache = getContactoByTelefono(phone) || contacto || {}
-
       const estado = {
-        esClienteNuevo: !contactoCache || contactoCache.NOMBRE === 'Sin Nombre',
-        contacto: contactoCache
+        esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
+        contacto: contacto || {}
       }
 
       const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
@@ -116,7 +132,7 @@ if (!contacto) {
 
       const resumen = await generarResumenConversacionIA(txt, phone)
       if (resumen) {
-        await ActualizarResumenUltimaConversacion(contactoCache, phone, resumen)
+        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
         console.log('📝 [IAINFO] Resumen de conversación guardado.')
       }
 
@@ -131,9 +147,8 @@ if (!contacto) {
     const phone = ctx.from.split('@')[0]
     const message = ctx.body.trim()
 
-    // Siempre toma el contacto del cache actualizado
-let contacto = getContactoByTelefono(phone)
-const datos = {}
+    let contacto = getContactoByTelefono(phone)
+    const datos = {}
 
     await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
 
@@ -185,31 +200,26 @@ const datos = {}
         await state.update({ productosUltimaSugerencia: productos })
       }
 
-      // Siempre toma contacto actualizado (cache o fetch)
-      let contactoCache = getContactoByTelefono(phone) || contacto || {}
-
       const estado = {
-        esClienteNuevo: !contactoCache || contactoCache.NOMBRE === 'Sin Nombre',
-        contacto: { ...contactoCache, ...datos }
+        esClienteNuevo: !contacto || contacto.NOMBRE === 'Sin Nombre',
+        contacto: { ...contacto, ...datos } || {}
       }
 
       const res = await EnviarIA(txt, ENUNGUIONES.INFO, {
         ctx, flowDynamic, endFlow, gotoFlow, provider, state, promptExtra
       }, estado)
 
-      // Solo revisa datos de contacto si NO es mensaje de producto
       const { esConsultaProductos } = await obtenerIntencionConsulta(txt, state.get('ultimaConsulta') || '', state)
       if (!esConsultaProductos) {
         const esDatosContacto = await detectarIntencionContactoIA(txt)
         if (esDatosContacto) {
-          // LOG: muestra contacto cache antes de actualizar
-          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en cache:", contactoCache)
-          await verificarYActualizarContactoSiEsNecesario(txt, phone, contactoCache, datos)
+          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en cache:", contacto)
+          await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
         }
       }
       const resumen = await generarResumenConversacionIA(txt, phone)
       if (resumen) {
-        await ActualizarResumenUltimaConversacion(contactoCache, phone, resumen)
+        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
       }
 
       await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
