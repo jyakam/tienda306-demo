@@ -66,112 +66,103 @@ export function SincronizarContactos() {
 
 // ----> FUNCION PRINCIPAL BLINDADA + USANDO CACHE <----
 export async function ActualizarContacto(phone, datos = {}) {
-  if (typeof datos !== 'object') {
-    console.log(`⛔ Datos inválidos para contacto ${phone}`)
-    return
-  }
-  if (Object.keys(datos).length === 0) {
-    console.log(`⛔ No hay datos nuevos para actualizar contacto ${phone}`)
-    await ActualizarFechas(phone)
-    return
-  }
-
-  // SIEMPRE busca el contacto más actualizado (puede venir de AppSheet si no está en RAM)
-  let contactoExistente = await getContactoByTelefono(phone)
-  if (!contactoExistente) {
-    // Si no existe, crea el contacto básico (solo número y fechas)
-    contactoExistente = {
-      TELEFONO: phone,
-      FECHA_PRIMER_CONTACTO: new Date().toLocaleDateString('es-CO'),
-      FECHA_ULTIMO_CONTACTO: new Date().toLocaleDateString('es-CO'),
-      RESP_BOT: 'Sí',
-      ETIQUETA: 'Cliente'
+  console.log(`📥 [CONTACTOS] Iniciando ActualizarContacto para ${phone} con datos:`, datos);
+  try {
+    if (typeof datos !== 'object') {
+      console.log(`⛔ [CONTACTOS] Datos inválidos para contacto ${phone}`);
+      return;
     }
-  }
+    if (Object.keys(datos).length === 0) {
+      console.log(`⛔ [CONTACTOS] No hay datos nuevos para actualizar contacto ${phone}`);
+      await ActualizarFechas(phone);
+      return;
+    }
 
-  // DEBUG LOGS previos
-  console.log(`👁️‍🗨️ [CONTACTO ANTERIOR]:`, JSON.stringify(contactoExistente, null, 2))
-  console.log(`🆕 [DATOS RECIBIDOS]:`, JSON.stringify(datos, null, 2))
+    let contactoExistente = await getContactoByTelefono(phone);
+    console.log(`🔍 [CONTACTOS] Contacto existente para ${phone}:`, contactoExistente);
+    if (!contactoExistente) {
+      contactoExistente = {
+        TELEFONO: phone,
+        FECHA_PRIMER_CONTACTO: new Date().toLocaleDateString('es-CO'),
+        FECHA_ULTIMO_CONTACTO: new Date().toLocaleDateString('es-CO'),
+        RESP_BOT: 'Sí',
+        ETIQUETA: 'Cliente'
+      };
+      console.log(`🆕 [CONTACTOS] Creando contacto base para ${phone}:`, contactoExistente);
+    }
 
-  // Merge: todos los campos previos + los nuevos, NO borra lo anterior
-  const contactoFinal = { ...contactoExistente }
+    const contactoFinal = { ...contactoExistente };
+    contactoFinal.TELEFONO = phone;
+    contactoFinal.RESP_BOT = contactoExistente.RESP_BOT || 'Sí';
+    contactoFinal.ETIQUETA = contactoExistente.ETIQUETA || 'Cliente';
 
-  // Proteger la clave TELEFONO
-  contactoFinal.TELEFONO = phone
-  contactoFinal.RESP_BOT = contactoExistente.RESP_BOT || 'Sí'
-  contactoFinal.ETIQUETA = contactoExistente.ETIQUETA || 'Cliente'
-
-  for (const campo in datos) {
-    let valor = datos[campo]
-    if (typeof valor === 'string') valor = valor.trim()
-    // Nunca actualices TELEFONO a un número diferente: guárdalo como secundario si aplica
-    if (campo.toUpperCase() === 'TELEFONO' && valor !== phone) {
-      if (valor && valor !== contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO) {
-        contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO = valor
+    for (const campo in datos) {
+      let valor = datos[campo];
+      if (typeof valor === 'string') valor = valor.trim();
+      if (campo.toUpperCase() === 'TELEFONO' && valor !== phone) {
+        if (valor && valor !== contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO) {
+          contactoFinal.NUMERO_DE_TELEFONO_SECUNDARIO = valor;
+        }
+        continue;
       }
-      continue
-    }
-    // Solo actualiza si el valor NO es vacío
-    if (
-      (typeof valor === 'string' && valor !== '') ||
-      typeof valor === 'number' ||
-      typeof valor === 'boolean'
-    ) {
-      const campoNormalizado = campo.toUpperCase() === 'TIPO_CLIENTE' ? 'TIPO DE CLIENTE' : campo.toUpperCase()
-      if (COLUMNAS_VALIDAS.includes(campoNormalizado)) {
-        contactoFinal[campoNormalizado] = valor
-      } else {
-        console.warn(`⚠️ Campo ${campoNormalizado} no está en la tabla PAG_CONTACTOS, ignorado`)
+      if (
+        (typeof valor === 'string' && valor !== '') ||
+        typeof valor === 'number' ||
+        typeof valor === 'boolean'
+      ) {
+        const campoNormalizado = campo.toUpperCase() === 'TIPO_CLIENTE' ? 'TIPO DE CLIENTE' : campo.toUpperCase();
+        if (COLUMNAS_VALIDAS.includes(campoNormalizado)) {
+          contactoFinal[campoNormalizado] = valor;
+        } else {
+          console.warn(`⚠️ [CONTACTOS] Campo ${campoNormalizado} no está en la tabla PAG_CONTACTOS, ignorado`);
+        }
       }
     }
-  }
 
-  // Preserva los campos previos que no fueron enviados ni borrados
-  for (const campo of COLUMNAS_VALIDAS) {
-    if (!(campo in contactoFinal) && contactoExistente[campo] !== undefined && contactoExistente[campo] !== null) {
-      contactoFinal[campo] = contactoExistente[campo]
+    for (const campo of COLUMNAS_VALIDAS) {
+      if (!(campo in contactoFinal) && contactoExistente[campo] !== undefined && contactoExistente[campo] !== null) {
+        contactoFinal[campo] = contactoExistente[campo];
+      }
     }
-  }
 
-  // Solo envía campos válidos y con valor
-  const contactoLimpio = Object.fromEntries(
-    Object.entries(contactoFinal).filter(([key, v]) =>
-      COLUMNAS_VALIDAS.includes(key) &&
-      (
-        (typeof v === 'string' && v.trim() !== '') ||
-        typeof v === 'number' ||
-        typeof v === 'boolean'
+    console.log(`🔄 [CONTACTOS] Contacto final para ${phone}:`, contactoFinal);
+
+    const contactoLimpio = Object.fromEntries(
+      Object.entries(contactoFinal).filter(([key, v]) =>
+        COLUMNAS_VALIDAS.includes(key) &&
+        (
+          (typeof v === 'string' && v.trim() !== '') ||
+          typeof v === 'number' ||
+          typeof v === 'boolean'
+        )
       )
-    )
-  )
+    );
+    console.log(`🧹 [CONTACTOS] Contacto limpio para ${phone}:`, contactoLimpio);
 
-  // LOG después del merge
-  console.log(`🧩 [CONTACTO A GUARDAR]:`, JSON.stringify(contactoLimpio, null, 2))
-
-  // Validar campos obligatorios
-  const camposObligatorios = ['TELEFONO']
-  for (const campo of camposObligatorios) {
-    if (!(campo in contactoLimpio) || contactoLimpio[campo] === undefined || contactoLimpio[campo] === '') {
-      console.error(`⛔ Falta el campo obligatorio ${campo} para contacto ${phone}`)
-      return
+    const camposObligatorios = ['TELEFONO'];
+    for (const campo of camposObligatorios) {
+      if (!(campo in contactoLimpio) || contactoLimpio[campo] === undefined || contactoLimpio[campo] === '') {
+        console.error(`❌ [CONTACTOS] Falta campo obligatorio ${campo} para ${phone}`);
+        return;
+      }
     }
-  }
 
-  await ActualizarFechas(phone)
-  // Si quieres: después de fechas, podrías recargar el contacto otra vez por seguridad
-  // contactoExistente = await getContactoByTelefono(phone)
+    await ActualizarFechas(phone);
 
- try {
-  console.log(`📤 [postTable] Enviando a AppSheet:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades })
-  const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades)
-  if (!resp) {
-    console.error(`❌ postTable devolvió null/undefined para contacto ${phone}`)
-    throw new Error('Respuesta vacía de AppSheet')
+    console.log(`📤 [postTable] Enviando a AppSheet para ${phone}:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades });
+    const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades);
+    console.log(`📦 [CONTACTOS] Respuesta de postTable para ${phone}:`, resp);
+    if (!resp) {
+      console.error(`❌ [CONTACTOS] postTable devolvió null/undefined para ${phone}`);
+      throw new Error('Respuesta vacía de AppSheet');
+    }
+
+    console.log(`🗃️ [CONTACTOS] Actualizando caché para ${phone} con:`, contactoFinal);
+    actualizarContactoEnCache(contactoFinal);
+    console.log(`✅ [CONTACTOS] Contacto ${phone} actualizado en caché.`);
+  } catch (error) {
+    console.error(`❌ [CONTACTOS] Error en ActualizarContacto para ${phone}:`, error.message, error.stack);
+    console.log(`🗃️ [CONTACTOS] Forzando actualización de caché para ${phone} pese a error`);
+    actualizarContactoEnCache({ TELEFONO: phone, ...datos });
   }
-  console.log(`📦 Respuesta de postTable:`, resp)
-} catch (error) {
-  console.error(`❌ Error actualizando contacto ${phone}:`, error.message)
-}
-actualizarContactoEnCache(contactoFinal)
-console.log(`✅ Contacto ${phone} actualizado en caché.`)
 }
