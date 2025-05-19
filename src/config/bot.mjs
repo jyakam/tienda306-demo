@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { AppSheetUser, getTable } from 'appsheet-connect'
 import { getIdDocFromUrl, getTxtDoc } from 'googledocs-downloader'
-import { cargarContactosDesdeAppSheet, getCacheContactos } from './funciones/helpers/cacheContactos.mjs'
+import { cargarContactosDesdeAppSheet, getCacheContactos } from '../funciones/helpers/cacheContactos.mjs'
 
 //TT APSHEET CREDENCIALES
 const appsheetId = process.env.APPSHEET_ID
