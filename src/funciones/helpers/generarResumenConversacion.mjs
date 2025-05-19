@@ -1,7 +1,31 @@
 // src/funciones/helpers/generarResumenConversacion.mjs
 
+import { OpenIA } from '../../config/bot.mjs'; // Ajusta la ruta según tu estructura
+import { BOT } from '../../config/bot.mjs'; // Importamos BOT para acceder a MODELO_IA, TEMPERATURA y TOKENS
+
 export async function generarResumenConversacionIA(mensaje, telefono) {
   try {
+    // Obtener la instancia de OpenAI configurada
+    const openai = OpenIA();
+
+    // Validar que la instancia esté correctamente inicializada
+    if (!openai) {
+      console.error('❌ [OPENAI] No se pudo inicializar la instancia de OpenAI.');
+      throw new Error('Instancia de OpenAI no disponible');
+    }
+
+    // Validar que BOT.MODELO_IA esté definido
+    if (!BOT.MODELO_IA) {
+      console.error('❌ [OPENAI] BOT.MODELO_IA no está definido.');
+      throw new Error('BOT.MODELO_IA no está definido');
+    }
+
+    // Log para depurar el modelo seleccionado
+    console.log('🤖 [DEBUG] Modelo OpenAI seleccionado:', BOT.MODELO_IA);
+
+    // Log para depurar temperatura y tokens
+    console.log('🔧 [DEBUG] Temperatura:', BOT.TEMPERATURA, 'Max tokens:', BOT.TOKENS);
+
     const prompt = `
 Eres un asistente que analiza conversaciones para resumir la intención del cliente.
 
@@ -11,54 +35,25 @@ Ejemplo de salida: "El cliente preguntó por tipos de tenis deportivos y quedó 
 
 MENSAJE:
 "${mensaje}"
-`
+`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: 'Eres un generador de resumen de intención del cliente.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3
-      })
-    })
-
-    // Validar el estado HTTP de la respuesta
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ [OPENAI] Error en la solicitud a la API:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText.slice(0, 200) // Limitamos para no saturar el log
-      });
-      throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    // Intentar parsear la respuesta como JSON
-    let json;
-    try {
-      json = await response.json();
-    } catch (parseError) {
-      const rawResponse = await response.text();
-      console.error('❌ [OPENAI] Error al parsear respuesta como JSON:', parseError.message, {
-        rawResponse: rawResponse.slice(0, 200) // Mostrar parte de la respuesta cruda
-      });
-      throw parseError;
-    }
+    const response = await openai.chat.completions.create({
+      model: BOT.MODELO_IA,
+      messages: [
+        { role: 'system', content: 'Eres un generador de resumen de intención del cliente.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: BOT.TEMPERATURA || 0.3, // Usamos BOT.TEMPERATURA, con 0.3 como respaldo
+      max_tokens: BOT.TOKENS || 100 // Usamos BOT.TOKENS, con 100 como respaldo
+    });
 
     // Validar que la respuesta tenga la estructura esperada
-    if (!json.choices || !json.choices[0]?.message?.content) {
-      console.error('❌ [OPENAI] Respuesta de API no tiene la estructura esperada:', json);
+    if (!response.choices || !response.choices[0]?.message?.content) {
+      console.error('❌ [OPENAI] Respuesta de API no tiene la estructura esperada:', response);
       throw new Error('Respuesta de OpenAI no contiene choices o content');
     }
 
-    const resumen = json.choices[0].message.content.trim();
+    const resumen = response.choices[0].message.content.trim();
     return resumen || '';
   } catch (err) {
     console.error('❌ Error generando resumen contextual IA:', {
