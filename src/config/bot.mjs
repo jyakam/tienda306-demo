@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { AppSheetUser, getTable } from 'appsheet-connect'
 import { getIdDocFromUrl, getTxtDoc } from 'googledocs-downloader'
+import { cargarContactosDesdeAppSheet, getCacheContactos } from './funciones/helpers/cacheContactos.mjs'
 
 //TT APSHEET CREDENCIALES
 const appsheetId = process.env.APPSHEET_ID
@@ -167,25 +168,11 @@ export async function ActualizarMensajes() {
 //SS ACTUALIZAR CONTACTOS
 export async function ActualizarContactos() {
   try {
-    const data = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS)
-    if (data !== null) {
-      // Fusionar datos locales con los de AppSheet
-      const nuevosContactos = []
-      for (const contactoAppSheet of data) {
-        const contactoLocal = CONTACTOS.LISTA_CONTACTOS.find(c => c.TELEFONO === contactoAppSheet.TELEFONO) || {}
-        const contactoFusionado = { ...contactoLocal, ...contactoAppSheet }
-        // Preservar campos locales si no están vacíos
-        for (const campo of ['NOMBRE', 'EMAIL', 'CIUDAD', 'PAIS', 'DIRECCION', 'IDENTIFICACION', 'TIPO DE CLIENTE']) {
-          if (contactoLocal[campo] && contactoLocal[campo].trim() !== '' && contactoLocal[campo] !== 'sin nombre') {
-            contactoFusionado[campo] = contactoLocal[campo]
-          }
-        }
-        nuevosContactos.push(contactoFusionado)
-      }
-      CONTACTOS.LISTA_CONTACTOS = nuevosContactos
-      return console.log('✅ INFORMACION DE CONTACTOS CARGADA')
-    }
-    return console.error('❌ NO SE LOGRO CARGAR INFORMACION DE CONTACTOS')
+    console.log('🔄 [CONTACTOS] Intentando cargar contactos desde AppSheet')
+    await cargarContactosDesdeAppSheet()
+    CONTACTOS.LISTA_CONTACTOS = getCacheContactos()
+    console.log(`🗃️ [CONTACTOS] Cache sincronizada con ${CONTACTOS.LISTA_CONTACTOS.length} contactos`)
+    return console.log('✅ INFORMACION DE CONTACTOS CARGADA')
   } catch (err) {
     console.error('❌ Error en ActualizarContactos:', err.message)
     return console.error('❌ NO SE LOGRO CARGAR INFORMACION DE CONTACTOS')
