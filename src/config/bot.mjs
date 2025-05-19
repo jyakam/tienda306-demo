@@ -169,6 +169,7 @@ export async function ActualizarMensajes() {
 export async function ActualizarContactos() {
   try {
     console.log('🔄 [CONTACTOS] Intentando cargar contactos desde AppSheet')
+    console.log('🔍 [DEBUG] Contactos iniciales en LISTA_CONTACTOS:', CONTACTOS.LISTA_CONTACTOS); // Añadido
     await cargarContactosDesdeAppSheet()
     CONTACTOS.LISTA_CONTACTOS = getCacheContactos()
     console.log(`🗃️ [CONTACTOS] Cache sincronizada con ${CONTACTOS.LISTA_CONTACTOS.length} contactos`)
