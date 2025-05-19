@@ -231,17 +231,20 @@ await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
       const { esConsultaProductos } = await obtenerIntencionConsulta(txt, state.get('ultimaConsulta') || '', state)
       if (!esConsultaProductos) {
         const esDatosContacto = await detectarIntencionContactoIA(txt)
-        if (esDatosContacto) {
-          console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en cache:", contacto)
-          await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
-        }
-      }
-      const resumen = await generarResumenConversacionIA(txt, phone)
-      if (resumen) {
-        await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-      }
+if (esDatosContacto) {
+  console.log("🛡️ [FLOWIAINFO] Se va a actualizar contacto. Contacto en cache:", contacto)
+  await verificarYActualizarContactoSiEsNecesario(txt, phone, contacto, datos)
+}
+try {
+  const resumen = await generarResumenConversacionIA(txt, phone)
+  if (resumen) {
+    await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+  }
+} catch (error) {
+  console.error('❌ [IAINFO] Error al generar resumen:', error.message);
+}
 
-      await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
       await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
     })
