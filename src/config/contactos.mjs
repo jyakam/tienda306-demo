@@ -149,20 +149,26 @@ export async function ActualizarContacto(phone, datos = {}) {
 
     await ActualizarFechas(phone);
 
-    console.log(`📤 [postTable] Enviando a AppSheet para ${phone}:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades });
-    const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades);
-    console.log(`📦 [CONTACTOS] Respuesta de postTable para ${phone}:`, resp);
-    if (!resp) {
-      console.error(`❌ [CONTACTOS] postTable devolvió null/undefined para ${phone}`);
-      throw new Error('Respuesta vacía de AppSheet');
-    }
+const startTime = Date.now(); // Añadido
+console.log('⏱️ [DEBUG] Inicio de postTable para', phone); // Añadido
+console.log(`📤 [postTable] Enviando a AppSheet para ${phone}:`, { table: process.env.PAG_CONTACTOS, data: [contactoLimpio], propiedades });
+const resp = await postTableWithRetry(APPSHEETCONFIG, process.env.PAG_CONTACTOS, [contactoLimpio], propiedades);
+console.log('⏱️ [DEBUG] Fin de postTable para', phone, 'Tiempo:', Date.now() - startTime, 'ms'); // Añadido
+console.log(`📦 [CONTACTOS] Respuesta de postTable para ${phone}:`, resp);
+if (!resp) {
+  console.error(`❌ [CONTACTOS] postTable devolvió null/undefined para ${phone}`);
+  console.error('❌ [CONTACTOS] Error en postTable, preservando datos locales:', phone); // Añadido
+  actualizarContactoEnCache(contactoExistente); // Añadido
+  return contactoExistente; // Añadido
+  // throw new Error('Respuesta vacía de AppSheet'); // Comentado para evitar salir del try
+}
 
-    console.log(`🗃️ [CONTACTOS] Actualizando caché para ${phone} con:`, contactoFinal);
-    actualizarContactoEnCache(contactoFinal);
-    console.log(`✅ [CONTACTOS] Contacto ${phone} actualizado en caché.`);
-  } catch (error) {
-    console.error(`❌ [CONTACTOS] Error en ActualizarContacto para ${phone}:`, error.message, error.stack);
-    console.log(`🗃️ [CONTACTOS] Forzando actualización de caché para ${phone} pese a error`);
-    actualizarContactoEnCache({ TELEFONO: phone, ...datos });
-  }
+console.log(`🗃️ [CONTACTOS] Actualizando caché para ${phone} con:`, contactoFinal);
+actualizarContactoEnCache(contactoFinal);
+console.log(`✅ [CONTACTOS] Contacto ${phone} actualizado en caché.`);
+} catch (error) {
+  console.error(`❌ [CONTACTOS] Error en ActualizarContacto para ${phone}:`, error.message, error.stack);
+  console.log(`🗃️ [CONTACTOS] Forzando actualización de caché para ${phone} pese a error`);
+  actualizarContactoEnCache({ TELEFONO: phone, ...datos });
+}
 }
