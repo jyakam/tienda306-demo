@@ -1,7 +1,7 @@
 // app.js
 import { createBot, createProvider, createFlow, MemoryDB } from '@builderbot/bot'
 import { BaileysProvider } from '@builderbot/provider-baileys'
-import { Inicializar } from '../config/bot.mjs'
+import { Inicializar } from './src/config/bot.mjs'
 
 // 🔧 MODULOS DEL SISTEMA
 import { APIREST } from './src/APIs/API_Rest.mjs'
