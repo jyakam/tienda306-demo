@@ -1,6 +1,7 @@
 // app.js
 import { createBot, createProvider, createFlow, MemoryDB } from '@builderbot/bot'
 import { BaileysProvider } from '@builderbot/provider-baileys'
+import { Inicializar } from '../config/bot.mjs'
 
 // 🔧 MODULOS DEL SISTEMA
 import { APIREST } from './src/APIs/API_Rest.mjs'
@@ -51,7 +52,8 @@ const main = async () => {
   PROVEEDOR.name = ENUNPROV.BAILEYS
   PROVEEDOR.prov = adapterProvider
 
-  console.log('🤖 Creando bot')
+await Inicializar()
+   console.log('🤖 Creando bot')
   const bot = await createBot({
     flow: adapterFlow,
     provider: adapterProvider,
