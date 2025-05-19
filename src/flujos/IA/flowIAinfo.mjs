@@ -44,11 +44,12 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
   let contacto = getContactoByTelefono(phone)
   if (!contacto) {
-    console.log(`🔄 [IAINFO] Contacto no encontrado, intentando recargar caché`)
-    await cargarContactosDesdeAppSheet()
-    contacto = getContactoByTelefono(phone)
-    console.log(`🔍 [IAINFO] Contacto tras recargar caché:`, contacto)
-  }
+  console.log(`🔄 [IAINFO] Contacto no encontrado, intentando recargar caché`)
+  await cargarContactosDesdeAppSheet()
+  contacto = getContactoByTelefono(phone)
+  console.log('🔍 [DEBUG] Contacto después de recargar caché:', contacto); // Añadido
+  console.log(`🔍 [IAINFO] Contacto tras recargar caché:`, contacto)
+}
 
   if (!contacto) {
     console.log(`🆕 [IAINFO] Creando contacto nuevo para: ${phone}`)
@@ -144,13 +145,17 @@ export const flowIAinfo = addKeyword(EVENTS.WELCOME)
 
     console.log('📥 [IAINFO] Respuesta completa recibida de IA:', res?.respuesta)
 
-    const resumen = await generarResumenConversacionIA(txt, phone)
-    if (resumen) {
-      await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
-      console.log('📝 [IAINFO] Resumen de conversación guardado.')
-    }
+try {
+  const resumen = await generarResumenConversacionIA(txt, phone)
+  if (resumen) {
+    await ActualizarResumenUltimaConversacion(contacto, phone, resumen)
+    console.log('📝 [IAINFO] Resumen de conversación guardado.')
+  }
+} catch (error) {
+  console.error('❌ [IAINFO] Error al generar resumen:', error.message);
+}
 
-    await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
+await manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt)
 
     await state.update({ productoDetectadoEnImagen: false, productoReconocidoPorIA: '' })
   })
@@ -269,18 +274,22 @@ async function Responder(res, ctx, flowDynamic, state) {
     await Esperar(BOT.DELAY)
 
     const yaRespondido = state.get('ultimaRespuestaSimple') || ''
-    const nuevaRespuesta = res.respuesta.toLowerCase().trim()
+ const nuevaRespuesta = res.respuesta.toLowerCase().trim()
 
-    if (nuevaRespuesta && nuevaRespuesta === yaRespondido) {
-      console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.')
-      return
-    }
+if (nuevaRespuesta && nuevaRespuesta === yaRespondido) {
+  console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.')
+  return
+}
 
-    await state.update({ ultimaRespuestaSimple: nuevaRespuesta })
+await state.update({ ultimaRespuestaSimple: nuevaRespuesta })
 
-    const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx)
-    return await flowDynamic(msj)
-  }
+const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx)
+const startTime = Date.now(); // Añadido
+console.log('⏱️ [DEBUG] Inicio de envío de mensaje a', ctx.from.split('@')[0]); // Añadido
+await flowDynamic(msj)
+console.log('⏱️ [DEBUG] Fin de envío de mensaje a', ctx.from.split('@')[0], 'Tiempo:', Date.now() - startTime, 'ms'); // Añadido
+return await flowDynamic(msj)
+}
 }
 
 async function obtenerProductosCorrectos(texto, state) {
