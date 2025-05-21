@@ -275,24 +275,25 @@ async function manejarRespuestaIA(res, ctx, flowDynamic, gotoFlow, state, txt) {
 
 async function Responder(res, ctx, flowDynamic, state) {
   if (res.tipo === ENUM_IA_RESPUESTAS.TEXTO && res.respuesta) {
-    await Esperar(BOT.DELAY)
+    await Esperar(BOT.DELAY);
 
-    const yaRespondido = state.get('ultimaRespuestaSimple') || ''
-    const nuevaRespuesta = res.respuesta.toLowerCase().trim()
+    const yaRespondido = state.get('ultimaRespuestaSimple') || '';
+    const nuevaRespuesta = res.respuesta.toLowerCase().trim();
 
     if (nuevaRespuesta && nuevaRespuesta === yaRespondido) {
-      console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.')
-      return
+      console.log('⚡ Respuesta ya fue enviada antes, evitando repetición.');
+      return;
     }
 
-    await state.update({ ultimaRespuestaSimple: nuevaRespuesta })
+    await state.update({ ultimaRespuestaSimple: nuevaRespuesta });
 
-    const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx)
-    const startTime = Date.now(); // Añadido
-    console.log('⏱️ [DEBUG] Inicio de envío de mensaje a', ctx.from.split('@')[0]); // Añadido
-    await flowDynamic(msj)
-    console.log('⏱️ [DEBUG] Fin de envío de mensaje a', ctx.from.split('@')[0], 'Tiempo:', Date.now() - startTime, 'ms'); // Añadido
-    return await flowDynamic(msj)
+    const msj = await EnviarImagenes(res.respuesta, flowDynamic, ctx);
+    const startTime = Date.now();
+    console.log('⏱️ [DEBUG] Inicio de envío de mensaje a', ctx.from.split('@')[0]);
+    await flowDynamic(msj);
+    console.log('⏱️ [DEBUG] Fin de envío de mensaje a', ctx.from.split('@')[0], 'Tiempo:', Date.now() - startTime, 'ms');
+    // Solo UNA llamada a flowDynamic, problema resuelto.
+    return;
   }
 }
 
